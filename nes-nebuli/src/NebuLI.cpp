@@ -220,7 +220,7 @@ void validateAndSetSinkDescriptors(const QueryPlan& query, const QueryConfig& co
     }
 }
 
-std::shared_ptr<DecomposedQueryPlan> createFullySpecifiedQueryPlan(const QueryConfig& config)
+std::shared_ptr<DecomposedQueryPlan> createFullySpecifiedQueryPlan(const QueryConfig& config, bool queryPerOptimization, int optimizationStage)
 {
     auto sourceCatalog = std::make_shared<Catalogs::Source::SourceCatalog>();
 
@@ -265,7 +265,7 @@ std::shared_ptr<DecomposedQueryPlan> createFullySpecifiedQueryPlan(const QueryCo
     typeInference->performTypeInferenceQuery(query);
 
     originIdInferencePhase->execute(query);
-    queryRewritePhase->execute(query);
+    queryRewritePhase->execute(query, queryPerOptimization, optimizationStage);
     typeInference->performTypeInferenceQuery(query);
 
     NES_INFO("QEP:\n {}", query->toString());
@@ -297,11 +297,19 @@ std::shared_ptr<DecomposedQueryPlan> loadFrom(std::istream& inputStream)
     try
     {
         auto config = YAML::Load(inputStream).as<QueryConfig>();
-        return createFullySpecifiedQueryPlan(config);
+        /// QueryPerOptimization is currently only relevant for benchmarking
+        return createFullySpecifiedQueryPlan(config, false, 0);
     }
     catch (const YAML::ParserException& pex)
     {
         throw QueryDescriptionNotParsable("{}", pex.what());
     }
 }
+
+int getNumberOfOptionalOptimizations()
+{
+    auto queryRewritePhase = Optimizer::QueryRewritePhase::create();
+    return queryRewritePhase->getNumberOfOptionalRewriteRules();
+}
+
 }

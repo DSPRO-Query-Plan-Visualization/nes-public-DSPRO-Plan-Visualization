@@ -48,8 +48,9 @@ Configuration::SystestConfiguration readConfiguration(int argc, const char** arg
 
     /// test discovery
     program.add_argument("-t", "--testLocation")
-        .help("directly specified test file, e.g., fliter.test or a directory to discover test files in.  Use "
-              "'path/to/testfile:testnumber' to run a specific test by testnumber within a file. Default: " TEST_DISCOVER_DIR);
+        .help(
+            "directly specified test file, e.g., fliter.test or a directory to discover test files in.  Use "
+            "'path/to/testfile:testnumber' to run a specific test by testnumber within a file. Default: " TEST_DISCOVER_DIR);
     program.add_argument("-g", "--groups").help("run a specific test groups").nargs(argparse::nargs_pattern::at_least_one);
     program.add_argument("-e", "--exclude-groups")
         .help("ignore groups, takes precedence over -g")
@@ -70,8 +71,8 @@ Configuration::SystestConfiguration readConfiguration(int argc, const char** arg
 
     /// result dir
     program.add_argument("--workingDir")
-        .help("change the working directory. This directory contains source and result files. Default: " PATH_TO_BINARY_DIR
-              "/nes-systests/");
+        .help(
+            "change the working directory. This directory contains source and result files. Default: " PATH_TO_BINARY_DIR "/nes-systests/");
 
     /// server/remote mode
     program.add_argument("-s", "--server").help("grpc uri, e.g., 127.0.0.1:8080, if not specified local single-node-worker is used.");
@@ -96,6 +97,13 @@ Configuration::SystestConfiguration readConfiguration(int argc, const char** arg
         .default_value(false)
         .implicit_value(true);
 
+    program.add_argument("--queryPerOptimizationStage")
+        .help(
+            "Runs a seperate query per optimization stage of Nebuli's QueryRewritePhase. This will only work when benchmarking (-b) is "
+            "enabled.")
+        .default_value(false)
+        .implicit_value(true);
+
     program.parse_args(argc, argv);
 
     auto config = Configuration::SystestConfiguration();
@@ -103,6 +111,10 @@ Configuration::SystestConfiguration readConfiguration(int argc, const char** arg
     if (program.is_used("-b"))
     {
         config.benchmark = true;
+        if (program.is_used("--queryPerOptimizationStage"))
+        {
+            config.queryPerOptimizationStage = true;
+        }
         if ((program.is_used("-n") || program.is_used("--numberConcurrentQueries"))
             && (program.get<int>("--numberConcurrentQueries") > 1 || program.get<int>("-n") > 1))
         {
@@ -355,7 +367,8 @@ int main(int argc, const char** argv)
         std::filesystem::create_directory(config.workingDir.getValue());
 
         auto testMap = Systest::loadTestFileMap(config);
-        const auto queries = loadQueries(testMap, config.workingDir.getValue(), config.testDataDir.getValue());
+        const auto queries
+            = loadQueries(testMap, config.workingDir.getValue(), config.testDataDir.getValue(), config.queryPerOptimizationStage);
         std::cout << std::format("Running a total of {} queries.", queries.size()) << '\n';
         if (queries.empty())
         {

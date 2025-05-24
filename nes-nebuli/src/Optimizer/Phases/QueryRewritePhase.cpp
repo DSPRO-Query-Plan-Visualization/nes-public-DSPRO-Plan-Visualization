@@ -43,23 +43,39 @@ QueryRewritePhase::QueryRewritePhase()
     predicateReorderingRule = PredicateReorderingRule::create();
     projectBeforeUnionOperatorRule = ProjectBeforeUnionOperatorRule::create();
     renameSourceToProjectOperatorRule = RenameSourceToProjectOperatorRule::create();
+
+    /// TODO #105 Once we have added And, Or, and other logical functions, we can call filterMergeRule. Otherwise, it might happen that we have a filter operator with an And function as a child.
+    optionalRewriteRules = {filterSplitUpRule, filterPushDownRule, predicateReorderingRule};
 }
 
-void QueryRewritePhase::execute(std::shared_ptr<QueryPlan>& queryPlan) const
+void QueryRewritePhase::execute(std::shared_ptr<QueryPlan>& queryPlan, bool queryPerOptimization, int optimizationStage) const
 {
     /// Apply rules necessary for enabling query execution when stream alias or union operators are involved
     queryPlan = renameSourceToProjectOperatorRule->apply(queryPlan);
     queryPlan = projectBeforeUnionOperatorRule->apply(queryPlan);
 
-    /// TODO #105 Once we have added And, Or, and other logical functions, we can call filterMergeRule. Otherwise, it might happen that we have a filter operator with an And function as a child.
-    /// Apply rule for filter split up
-    queryPlan = filterSplitUpRule->apply(queryPlan);
-    /// Apply rule for filter push down optimization
-    queryPlan = filterPushDownRule->apply(queryPlan);
-    /// Apply rule for filter merge
-    /// queryPlan = filterMergeRule->apply(queryPlan);
-    /// Apply rule for filter reordering optimization
-    queryPlan = predicateReorderingRule->apply(queryPlan);
+    if (queryPerOptimization)
+    {
+        for (int stage = 0; stage < optimizationStage; stage++)
+        {
+            /// We only apply as many optional rules, as the stage dictates. optimizationStage = 0 means that 0 rules are applied.
+            queryPlan = optionalRewriteRules[stage]->apply(queryPlan);
+        }
+    }
+    else
+    {
+        for (const auto& rule : optionalRewriteRules)
+        {
+            /// Apply all optional query rewrite rules. The query will compile, even if those are not applied
+            queryPlan = rule->apply(queryPlan);
+        }
+    }
 }
+
+int QueryRewritePhase::getNumberOfOptionalRewriteRules() const
+{
+    return optionalRewriteRules.size();
+}
+
 
 }

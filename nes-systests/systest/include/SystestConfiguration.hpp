@@ -49,6 +49,11 @@ public:
     Configurations::BoolOption randomQueryOrder = {"randomQueryOrder", "false", "run queries in random order"};
     Configurations::UIntOption numberConcurrentQueries = {"numberConcurrentQueries", "6", "number of maximal concurrently running queries"};
     Configurations::BoolOption benchmark = {"Benchmark Queries", "false", "Records the execution time of each query"};
+    Configurations::BoolOption queryPerOptimizationStage
+        = {"queryPerOptimizationStage",
+           "false",
+           "Creates and runs a query per stage of Nebuli's QueryRewritePhase per original query. Will only work when benchmark is set to "
+           "true"};
     Configurations::SequenceOption<Configurations::StringOption> testGroups = {"testGroups", "test groups to run"};
     Configurations::SequenceOption<Configurations::StringOption> excludeGroups = {"excludeGroups", "test groups to exclude"};
     Configurations::StringOption workerConfig = {"workerConfig", "", "used worker config file (.yaml)"};

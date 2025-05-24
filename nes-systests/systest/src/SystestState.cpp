@@ -22,6 +22,8 @@
 #include <vector>
 #include <fmt/format.h>
 #include <fmt/ranges.h> ///NOLINT: required by fmt
+
+#include <NebuLI.hpp>
 #include <SystestRunner.hpp>
 #include <SystestState.hpp>
 
@@ -55,28 +57,50 @@ TestFileMap discoverTestsRecursively(const std::filesystem::path& path, const st
     return testFiles;
 }
 
-void loadQueriesFromTestFile(TestFile& testfile, const std::filesystem::path& workingDir, const std::filesystem::path& testDataDir)
+void loadQueriesFromTestFile(
+    TestFile& testfile, const std::filesystem::path& workingDir, const std::filesystem::path& testDataDir, bool queryPerOptimization)
 {
-    auto loadedPlans = loadFromSLTFile(testfile.file, workingDir, testfile.name(), testDataDir);
+    auto loadedPlans = loadFromSLTFile(testfile.file, workingDir, testfile.name(), testDataDir, queryPerOptimization);
     uint64_t queryIdInFile = 0;
     std::unordered_set<uint64_t> foundQueries;
 
+    /// We need to obtain this number since the ith query id does not correspond to the ith query in the file if queryPerOptimization is enabled
+    int numOfOptionalOptimizationStages = CLI::getNumberOfOptionalOptimizations() + 1; /// +1 for the query without any rule applied
+
     for (const auto& [decomposedPlan, queryDefinition, sinkSchema] : loadedPlans)
     {
+        uint64_t actualQueryIdInFile = queryPerOptimization ? queryIdInFile / numOfOptionalOptimizationStages : queryIdInFile;
+        int optimizationStage = queryPerOptimization ? queryIdInFile % numOfOptionalOptimizationStages : 0;
         if (not testfile.onlyEnableQueriesWithTestQueryNumber.empty())
         {
             for (const auto& testNumber : testfile.onlyEnableQueriesWithTestQueryNumber
-                     | std::views::filter([&queryIdInFile](auto testNumber) { return testNumber == queryIdInFile + 1; }))
+                     | std::views::filter([&actualQueryIdInFile](auto testNumber) { return testNumber == actualQueryIdInFile + 1; }))
             {
-                foundQueries.insert(queryIdInFile + 1);
+                foundQueries.insert(actualQueryIdInFile + 1);
                 testfile.queries.emplace_back(
-                    testfile.name(), queryDefinition, testfile.file, decomposedPlan, queryIdInFile, workingDir, sinkSchema);
+                    testfile.name(),
+                    queryDefinition,
+                    testfile.file,
+                    decomposedPlan,
+                    actualQueryIdInFile,
+                    workingDir,
+                    sinkSchema,
+                    queryPerOptimization,
+                    optimizationStage);
             }
         }
         else
         {
             testfile.queries.emplace_back(
-                testfile.name(), queryDefinition, testfile.file, decomposedPlan, queryIdInFile, workingDir, sinkSchema);
+                testfile.name(),
+                queryDefinition,
+                testfile.file,
+                decomposedPlan,
+                actualQueryIdInFile,
+                workingDir,
+                sinkSchema,
+                queryPerOptimization,
+                optimizationStage);
         }
         ++queryIdInFile;
     }
@@ -127,7 +151,8 @@ TestFile::TestFile(std::filesystem::path file, std::vector<uint64_t> onlyEnableQ
     , onlyEnableQueriesWithTestQueryNumber(std::move(onlyEnableQueriesWithTestQueryNumber))
     , groups(readGroups(*this)) { };
 
-std::vector<Query> loadQueries(TestFileMap& testmap, const std::filesystem::path& workingDir, const std::filesystem::path& testDataDir)
+std::vector<Query> loadQueries(
+    TestFileMap& testmap, const std::filesystem::path& workingDir, const std::filesystem::path& testDataDir, bool queryPerOptimization)
 {
     std::vector<Query> queries;
     uint64_t loadedFiles = 0;
@@ -136,7 +161,7 @@ std::vector<Query> loadQueries(TestFileMap& testmap, const std::filesystem::path
         std::cout << "Loading queries from test file: file://" << testfile.getLogFilePath() << '\n' << std::flush;
         try
         {
-            loadQueriesFromTestFile(testfile, workingDir, testDataDir);
+            loadQueriesFromTestFile(testfile, workingDir, testDataDir, queryPerOptimization);
             for (auto& query : testfile.queries)
             {
                 queries.emplace_back(std::move(query));

@@ -55,7 +55,8 @@ std::vector<LoadedQueryPlan> loadFromSLTFile(
     const std::filesystem::path& testFilePath,
     const std::filesystem::path& workingDir,
     std::string_view testFileName,
-    const std::filesystem::path& testDataDir)
+    const std::filesystem::path& testDataDir,
+    bool queryPerOptimization)
 {
     std::vector<LoadedQueryPlan> plans{};
     CLI::QueryConfig config{};
@@ -79,22 +80,25 @@ std::vector<LoadedQueryPlan> loadFromSLTFile(
     parser.registerOnCSVSourceCallback(
         [&](SystestParser::CSVSource&& source)
         {
-            config.logical.emplace_back(CLI::LogicalSource{
-                .name = source.name,
-                .schema = [&source]()
-                {
-                    std::vector<CLI::SchemaField> schema;
-                    for (const auto& [type, name] : source.fields)
+            config.logical.emplace_back(
+                CLI::LogicalSource{
+                    .name = source.name,
+                    .schema = [&source]()
                     {
-                        schema.emplace_back(name, type);
-                    }
-                    return schema;
-                }()});
+                        std::vector<CLI::SchemaField> schema;
+                        for (const auto& [type, name] : source.fields)
+                        {
+                            schema.emplace_back(name, type);
+                        }
+                        return schema;
+                    }()});
 
-            config.physical.emplace_back(CLI::PhysicalSource{
-                .logical = source.name,
-                .parserConfig = {{"type", "CSV"}, {"tupleDelimiter", "\n"}, {"fieldDelimiter", ","}},
-                .sourceConfig = {{"type", "File"}, {"filePath", source.csvFilePath}, {"numberOfBuffersInSourceLocalBufferPool", "-1"}}});
+            config.physical.emplace_back(
+                CLI::PhysicalSource{
+                    .logical = source.name,
+                    .parserConfig = {{"type", "CSV"}, {"tupleDelimiter", "\n"}, {"fieldDelimiter", ","}},
+                    .sourceConfig
+                    = {{"type", "File"}, {"filePath", source.csvFilePath}, {"numberOfBuffersInSourceLocalBufferPool", "-1"}}});
         });
 
     parser.registerOnSLTSourceCallback(
@@ -102,23 +106,25 @@ std::vector<LoadedQueryPlan> loadFromSLTFile(
         {
             static uint64_t sourceIndex = 0;
 
-            config.logical.emplace_back(CLI::LogicalSource{
-                .name = source.name,
-                .schema = [&source]()
-                {
-                    std::vector<CLI::SchemaField> schema;
-                    for (const auto& [type, name] : source.fields)
+            config.logical.emplace_back(
+                CLI::LogicalSource{
+                    .name = source.name,
+                    .schema = [&source]()
                     {
-                        schema.emplace_back(name, type);
-                    }
-                    return schema;
-                }()});
+                        std::vector<CLI::SchemaField> schema;
+                        for (const auto& [type, name] : source.fields)
+                        {
+                            schema.emplace_back(name, type);
+                        }
+                        return schema;
+                    }()});
 
             const auto sourceFile = Query::sourceFile(workingDir, testFileName, sourceIndex++);
-            config.physical.emplace_back(CLI::PhysicalSource{
-                .logical = source.name,
-                .parserConfig = {{"type", "CSV"}, {"tupleDelimiter", "\n"}, {"fieldDelimiter", ","}},
-                .sourceConfig = {{"type", "File"}, {"filePath", sourceFile}, {"numberOfBuffersInSourceLocalBufferPool", "-1"}}});
+            config.physical.emplace_back(
+                CLI::PhysicalSource{
+                    .logical = source.name,
+                    .parserConfig = {{"type", "CSV"}, {"tupleDelimiter", "\n"}, {"fieldDelimiter", ","}},
+                    .sourceConfig = {{"type", "File"}, {"filePath", sourceFile}, {"numberOfBuffersInSourceLocalBufferPool", "-1"}}});
 
 
             {
@@ -142,82 +148,111 @@ std::vector<LoadedQueryPlan> loadFromSLTFile(
     parser.registerOnQueryCallback(
         [&](SystestParser::Query&& query)
         {
-            /// For system level tests, a single file can hold arbitrary many tests. We need to generate a unique sink name for
-            /// every test by counting up a static query number. We then emplace the unique sinks in the global (per test file) query config.
-            static size_t currentQueryNumber = 0;
-            static std::string currentTestFileName;
+            std::string sinkName;
+            std::string lastSinkForQuery;
+            /// Depending on whether we want to create a query per optimization stage applied or just one query where each optimization is applied on
+            /// We either go once through the loop or |optimizations| + 1 times (accounting for the query with 0 optimizations apllied)
+            for (int optimizationStage = 0;
+                 optimizationStage <= CLI::getNumberOfOptionalOptimizations() * static_cast<int>(queryPerOptimization);
+                 optimizationStage++)
+            {
+                /// For system level tests, a single file can hold arbitrary many tests. We need to generate a unique sink name for
+                /// every test by counting up a static query number. We then emplace the unique sinks in the global (per test file) query config.
+                static size_t currentQueryNumber = 0;
+                static std::string currentTestFileName;
 
-            /// We reset the current query number once we see a new test file
-            if (currentTestFileName != testFileName)
-            {
-                currentTestFileName = testFileName;
-                currentQueryNumber = 0;
-            }
-            else
-            {
-                ++currentQueryNumber;
-            }
-
-            /// We expect at least one sink to be defined in the test file
-            if (sinkNamesToSchema.empty())
-            {
-                throw TestException("No sinks defined in test file: {}", testFileName);
-            }
-
-            /// We have to get all sink names from the query and then create custom paths for each sink.
-            /// The filepath can not be the sink name, as we might have multiple queries with the same sink name, i.e., sink20Booleans in FunctionEqual.test
-            /// We assume:
-            /// - the INTO keyword is the last keyword in the query
-            /// - the sink name is the last word in the INTO clause
-            const auto sinkName = [&query]() -> std::string
-            {
-                const auto intoClause = query.find("INTO");
-                if (intoClause == std::string::npos)
+                /// We reset the current query number once we see a new test file
+                if (currentTestFileName != testFileName)
                 {
-                    NES_ERROR("INTO clause not found in query: {}", query);
-                    return "";
+                    currentTestFileName = testFileName;
+                    currentQueryNumber = 0;
                 }
-                const auto intoLength = std::string("INTO").length();
-                auto trimmedSinkName = std::string(Util::trimWhiteSpaces(query.substr(intoClause + intoLength)));
-
-                /// As the sink name might have a semicolon at the end, we remove it
-                if (trimmedSinkName.back() == ';')
+                else
                 {
-                    trimmedSinkName.pop_back();
+                    ++currentQueryNumber;
                 }
-                return trimmedSinkName;
-            }();
 
-            if (sinkName.empty() or not sinkNamesToSchema.contains(sinkName))
-            {
-                throw UnknownSinkType("Failed to find sink name <{}>", sinkName);
+                /// We expect at least one sink to be defined in the test file
+                if (sinkNamesToSchema.empty())
+                {
+                    throw TestException("No sinks defined in test file: {}", testFileName);
+                }
+
+                /// We have to get all sink names from the query and then create custom paths for each sink.
+                /// The filepath can not be the sink name, as we might have multiple queries with the same sink name, i.e., sink20Booleans in FunctionEqual.test
+                /// We assume:
+                /// - the INTO keyword is the last keyword in the query
+                /// - the sink name is the last word in the INTO clause
+                /// The sink must only be determined in the first iteration on a query
+
+                if (optimizationStage == 0)
+                {
+                    sinkName = [&query]() -> std::string
+                    {
+                        const auto intoClause = query.find("INTO");
+                        if (intoClause == std::string::npos)
+                        {
+                            NES_ERROR("INTO clause not found in query: {}", query);
+                            return "";
+                        }
+                        const auto intoLength = std::string("INTO").length();
+                        auto trimmedSinkName = std::string(Util::trimWhiteSpaces(query.substr(intoClause + intoLength)));
+
+                        /// As the sink name might have a semicolon at the end, we remove it
+                        if (trimmedSinkName.back() == ';')
+                        {
+                            trimmedSinkName.pop_back();
+                        }
+                        return trimmedSinkName;
+                    }();
+
+                    /// Its enough to check once per query
+                    if ((sinkName.empty() or not sinkNamesToSchema.contains(sinkName)) && optimizationStage == 0)
+                    {
+                        throw UnknownSinkType("Failed to find sink name <{}>", sinkName);
+                    }
+                    lastSinkForQuery = sinkName;
+                }
+
+                /// Replacing the sinkName with the created unique sink name
+                const auto sinkForQuery = sinkName + std::to_string(currentQueryNumber);
+                query = std::regex_replace(query, std::regex(lastSinkForQuery), sinkForQuery);
+                lastSinkForQuery = sinkForQuery;
+
+                std::filesystem::path resultFile;
+                /// Adding the sink to the sink config, such that we can create a fully specified query plan
+                if (queryPerOptimization)
+                {
+                    resultFile = Query::resultFile(
+                        workingDir,
+                        testFileName,
+                        currentQueryNumber / (CLI::getNumberOfOptionalOptimizations() + 1),
+                        queryPerOptimization,
+                        optimizationStage);
+                }
+                else
+                {
+                    resultFile = Query::resultFile(workingDir, testFileName, currentQueryNumber, queryPerOptimization, optimizationStage);
+                }
+
+                if (sinkName == "CHECKSUM")
+                {
+                    auto sink = CLI::Sink{sinkName, "Checksum", {std::make_pair("filePath", resultFile)}};
+                    config.sinks.emplace(sinkForQuery, std::move(sink));
+                }
+                else
+                {
+                    auto sinkCLI = CLI::Sink{
+                        sinkForQuery,
+                        "File",
+                        {std::make_pair("inputFormat", "CSV"), std::make_pair("filePath", resultFile), std::make_pair("append", "false")}};
+                    config.sinks.emplace(sinkForQuery, std::move(sinkCLI));
+                }
+
+                config.query = query;
+                auto plan = createFullySpecifiedQueryPlan(config, queryPerOptimization, optimizationStage);
+                plans.emplace_back(plan, query, sinkNamesToSchema[sinkName]);
             }
-
-
-            /// Replacing the sinkName with the created unique sink name
-            const auto sinkForQuery = sinkName + std::to_string(currentQueryNumber);
-            query = std::regex_replace(query, std::regex(sinkName), sinkForQuery);
-
-            /// Adding the sink to the sink config, such that we can create a fully specified query plan
-            const auto resultFile = Query::resultFile(workingDir, testFileName, currentQueryNumber);
-
-            if (sinkName == "CHECKSUM")
-            {
-                auto sink = CLI::Sink{sinkName, "Checksum", {std::make_pair("filePath", resultFile)}};
-                config.sinks.emplace(sinkForQuery, std::move(sink));
-            }
-            else
-            {
-                auto sinkCLI = CLI::Sink{
-                    sinkForQuery,
-                    "File",
-                    {std::make_pair("inputFormat", "CSV"), std::make_pair("filePath", resultFile), std::make_pair("append", "false")}};
-                config.sinks.emplace(sinkForQuery, std::move(sinkCLI));
-            }
-
-            config.query = query;
-            auto plan = createFullySpecifiedQueryPlan(config);
-            plans.emplace_back(plan, query, sinkNamesToSchema[sinkName]);
         });
     try
     {
@@ -415,7 +450,19 @@ std::vector<RunningQuery> serializeExecutionResults(const std::vector<RunningQue
         const auto executionTimeInNanos = std::chrono::duration_cast<std::chrono::nanoseconds>(
                                               queryRan.queryExecutionInfo.endTime - queryRan.queryExecutionInfo.startTime)
                                               .count();
-        resultJson.push_back({{"query name", queryRan.query.name}, {"time", executionTimeInNanos}});
+
+        if (queryRan.query.queryPerOptimizationEnabled)
+        {
+            resultJson.push_back(
+                {{"query name",
+                  queryRan.query.name + "_" + std::to_string(queryRan.query.queryIdInFile) + "_" + std::to_string(queryRan.query.stage)},
+                 {"time", executionTimeInNanos}});
+        }
+        else
+        {
+            resultJson.push_back(
+                {{"query name", queryRan.query.name + "_" + std::to_string(queryRan.query.queryIdInFile)}, {"time", executionTimeInNanos}});
+        }
     }
     return failedQueries;
 }
@@ -483,7 +530,15 @@ void printQueryResultToStdOut(
     /// And as this is only for test runs we use stdout here.
     std::cout << std::string(padSizeQueryCounter - queryCounterAsString.size(), ' ');
     std::cout << queryCounterAsString << "/" << totalQueries << " ";
-    std::cout << runningQuery.query.name << ":" << std::string(padSizeQueryNumber - queryNumberLength, '0') << queryNumberAsString;
+    if (runningQuery.query.queryPerOptimizationEnabled)
+    {
+        std::cout << runningQuery.query.name << ":" << std::string(padSizeQueryNumber - queryNumberLength, '0') << queryNumberAsString << ":" << std::to_string(runningQuery.query.stage);
+    }
+    else
+    {
+        std::cout << runningQuery.query.name << ":" << std::string(padSizeQueryNumber - queryNumberLength, '0') << queryNumberAsString;
+    }
+
     std::cout << std::string(padSizeSuccess - (queryNameLength + padSizeQueryNumber), '.');
     if (errorMessage.empty())
     {

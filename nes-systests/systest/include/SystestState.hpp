@@ -45,8 +45,12 @@ using TestGroup = std::string;
 
 struct Query
 {
-    static std::filesystem::path
-    resultFile(const std::filesystem::path& workingDir, std::string_view testName, const uint64_t queryIdInTestFile)
+    static std::filesystem::path resultFile(
+        const std::filesystem::path& workingDir,
+        std::string_view testName,
+        const uint64_t queryIdInTestFile,
+        bool queryPerOptimizationEnabled,
+        int stage)
     {
         auto resultDir = workingDir / "results";
         if (not is_directory(resultDir))
@@ -54,7 +58,10 @@ struct Query
             create_directory(resultDir);
             std::cout << "Created working directory: file://" << resultDir.string() << "\n";
         }
-
+        if (queryPerOptimizationEnabled)
+        {
+            return resultDir / std::filesystem::path(fmt::format("{}_{}_{}.csv", testName, queryIdInTestFile, stage));
+        }
         return resultDir / std::filesystem::path(fmt::format("{}_{}.csv", testName, queryIdInTestFile));
     }
 
@@ -78,7 +85,9 @@ struct Query
         std::shared_ptr<DecomposedQueryPlan> queryPlan,
         const uint64_t queryIdInFile,
         std::filesystem::path workingDir,
-        SystestParser::Schema sinkSchema)
+        SystestParser::Schema sinkSchema,
+        bool queryPerOptimizationEnabled,
+        int stage)
         : name(std::move(name))
         , queryDefinition(std::move(queryDefinition))
         , sqlLogicTestFile(std::move(sqlLogicTestFile))
@@ -86,10 +95,15 @@ struct Query
         , queryIdInFile(queryIdInFile)
         , workingDir(std::move(workingDir))
         , expectedSinkSchema(std::move(sinkSchema))
+        , queryPerOptimizationEnabled(queryPerOptimizationEnabled)
+        , stage(stage)
     {
     }
 
-    [[nodiscard]] std::filesystem::path resultFile() const { return resultFile(workingDir, name, queryIdInFile); }
+    [[nodiscard]] std::filesystem::path resultFile() const
+    {
+        return resultFile(workingDir, name, queryIdInFile, queryPerOptimizationEnabled, stage);
+    }
 
     TestName name;
     std::string queryDefinition;
@@ -98,6 +112,11 @@ struct Query
     uint64_t queryIdInFile;
     std::filesystem::path workingDir;
     SystestParser::Schema expectedSinkSchema;
+
+    /// If we create a query per optimization phase of NebuLI, queryPerOptimizationEnabled will be true and the stage will correspond to the number of rewrite rules applied.
+    /// Otherwise, the stages value will be zero per default but not carry any semantic value
+    bool queryPerOptimizationEnabled;
+    int stage;
 };
 
 struct QueryExecutionInfo
@@ -173,7 +192,9 @@ std::ostream& operator<<(std::ostream& os, const TestFileMap& testMap);
 TestFileMap loadTestFileMap(const Configuration::SystestConfiguration& config);
 
 /// returns a vector of queries to run derived for our testfilemap
-std::vector<Query> loadQueries(TestFileMap& testmap, const std::filesystem::path& workingDir, const std::filesystem::path& testDataDir);
+/// If 'queryPerOptimization' is enabled, this will create a query object per query in file per NebuLI optimization stage (currently 6 per query)
+std::vector<Query> loadQueries(
+    TestFileMap& testmap, const std::filesystem::path& workingDir, const std::filesystem::path& testDataDir, bool queryPerOptimization);
 }
 
 template <>

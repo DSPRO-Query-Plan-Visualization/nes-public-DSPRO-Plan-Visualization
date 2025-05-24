@@ -15,6 +15,7 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 
 namespace NES
 {
@@ -28,6 +29,7 @@ class CoordinatorConfiguration;
 
 namespace NES::Optimizer
 {
+class BaseRewriteRule;
 class QueryRewritePhase;
 class AttributeSortRule;
 class BinaryOperatorSortRule;
@@ -46,7 +48,9 @@ class QueryRewritePhase
 public:
     static std::shared_ptr<QueryRewritePhase> create();
 
-    void execute(std::shared_ptr<QueryPlan>& queryPlan) const;
+    void execute(std::shared_ptr<QueryPlan>& queryPlan, bool queryPerOptimization, int optimizationStage) const;
+
+    int getNumberOfOptionalRewriteRules() const;
 
 private:
     explicit QueryRewritePhase();
@@ -59,5 +63,7 @@ private:
     std::shared_ptr<PredicateReorderingRule> predicateReorderingRule;
     std::shared_ptr<ProjectBeforeUnionOperatorRule> projectBeforeUnionOperatorRule;
     std::shared_ptr<RenameSourceToProjectOperatorRule> renameSourceToProjectOperatorRule;
+
+    std::vector<std::shared_ptr<BaseRewriteRule>> optionalRewriteRules;
 };
 }

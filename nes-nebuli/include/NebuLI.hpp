@@ -66,5 +66,8 @@ struct QueryConfig
 
 std::shared_ptr<DecomposedQueryPlan> loadFromYAMLFile(const std::filesystem::path& file);
 std::shared_ptr<DecomposedQueryPlan> loadFrom(std::istream& inputStream);
-std::shared_ptr<DecomposedQueryPlan> createFullySpecifiedQueryPlan(const QueryConfig& config);
+std::shared_ptr<DecomposedQueryPlan> createFullySpecifiedQueryPlan(const QueryConfig& config, bool queryPerOptimization, int optimizationStage);
+
+/// Returns the number of non-required QueryRewritePhase rules
+int getNumberOfOptionalOptimizations();
 }
