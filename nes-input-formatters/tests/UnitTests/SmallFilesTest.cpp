@@ -29,7 +29,6 @@
 #include <Sources/SourceValidationProvider.hpp>
 #include <Util/Logger/Logger.hpp>
 #include <Util/TestTupleBuffer.hpp>
-#include <Util/TestUtil.hpp>
 #include <BaseUnitTest.hpp>
 #include <InputFormatterTestUtil.hpp>
 #include <TestTaskQueue.hpp>
@@ -89,7 +88,7 @@ public:
         const auto currentTestFile = testFileMap.at(testConfig.testFileName);
         const auto schema = InputFormatterTestUtil::createSchema(currentTestFile.schemaFieldTypes);
         PRECONDITION(
-            testConfig.sizeOfFormattedBuffers >= schema->getSchemaSizeInBytes(),
+            testConfig.sizeOfFormattedBuffers >= schema.getSchemaSizeInBytes(),
             "The formatted buffer must be large enough to hold at least one tuple.");
 
         const auto testFilePath = std::filesystem::path(INPUT_FORMATTER_TEST_DATA) / currentTestFile.fileName;
@@ -118,10 +117,10 @@ public:
         for (size_t i = 0; i < testConfig.numberOfIterations; ++i)
         {
             auto testBufferManager = Memory::BufferManager::create(testConfig.sizeOfFormattedBuffers, numberOfRequiredFormattedBuffers);
-            auto inputFormatterTask = InputFormatterTestUtil::createInputFormatterTask(*schema);
+            auto inputFormatterTask = InputFormatterTestUtil::createInputFormatterTask(schema);
             auto resultBuffers = std::make_shared<std::vector<std::vector<NES::Memory::TupleBuffer>>>(testConfig.numberOfThreads);
 
-            std::vector<Runtime::Execution::TestablePipelineTask> pipelineTasks;
+            std::vector<TestablePipelineTask> pipelineTasks;
             pipelineTasks.reserve(numberOfExpectedRawBuffers);
             rawBuffers.modifyBuffer(
                 [&](auto& rawBuffers)
@@ -131,14 +130,13 @@ public:
                         const auto currentWorkerThreadId = bufferIdx % testConfig.numberOfThreads;
                         const auto currentSequenceNumber = SequenceNumber(bufferIdx + 1);
                         rawBuffer.setSequenceNumber(currentSequenceNumber);
-                        auto pipelineTask = Runtime::Execution::TestablePipelineTask(
-                            WorkerThreadId(currentWorkerThreadId), rawBuffer, inputFormatterTask);
+                        auto pipelineTask = TestablePipelineTask(WorkerThreadId(currentWorkerThreadId), rawBuffer, inputFormatterTask);
                         pipelineTasks.emplace_back(std::move(pipelineTask));
                         ++bufferIdx;
                     }
                 });
-            auto taskQueue = std::make_unique<Runtime::Execution::MultiThreadedTestTaskQueue>(
-                testConfig.numberOfThreads, pipelineTasks, testBufferManager, resultBuffers);
+            auto taskQueue
+                = std::make_unique<MultiThreadedTestTaskQueue>(testConfig.numberOfThreads, pipelineTasks, testBufferManager, resultBuffers);
             taskQueue->startProcessing();
             taskQueue->waitForCompletion();
 
@@ -178,7 +176,6 @@ public:
                 out << Memory::MemoryLayouts::TestTupleBuffer::createTestTupleBuffer(resultBufferVec.back(), schema)
                            .toString(schema, Memory::MemoryLayouts::TestTupleBuffer::PrintMode::NO_HEADER_END_WITHOUT_NEWLINE);
             }
-
             out.close();
             ASSERT_TRUE(InputFormatterTestUtil::compareFiles(testFilePath, resultFilePath));
             resultBuffers->clear();

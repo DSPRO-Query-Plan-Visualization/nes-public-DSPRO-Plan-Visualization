@@ -27,7 +27,8 @@
 #include <Nautilus/Interface/PagedVector/PagedVector.hpp>
 #include <Nautilus/Interface/Record.hpp>
 #include <Nautilus/Interface/RecordBuffer.hpp>
-#include <Nautilus/NautilusBackend.hpp>
+
+#include <Util/ExecutionMode.hpp>
 #include <Util/Logger/LogLevel.hpp>
 #include <Util/Logger/Logger.hpp>
 #include <Util/Logger/impl/NesLogger.hpp>
@@ -45,15 +46,15 @@ namespace NES::Nautilus::Interface
 class ChainedHashMapCustomValueTest
     : public Testing::BaseUnitTest,
       public testing::WithParamInterface<
-          std::tuple<int, std::vector<BasicType>, std::vector<BasicType>, Nautilus::Configurations::NautilusBackend>>,
+          std::tuple<int, std::vector<BasicType>, std::vector<BasicType>, Nautilus::Configurations::ExecutionMode>>,
       public TestUtils::ChainedHashMapCustomValueTestUtils
 {
 public:
     /// This is fine, as we are writing all items for each number of keys
-    static constexpr TestUtils::MinMaxValue MIN_MAX_NUMBER_OF_ITEMS = {100, 2000};
-    static constexpr TestUtils::MinMaxValue MIN_MAX_NUMBER_OF_BUCKETS = {1, 2048};
-    static constexpr TestUtils::MinMaxValue MIN_MAX_PAGE_SIZE = {512, 10240};
-    Nautilus::Configurations::NautilusBackend backend;
+    static constexpr TestUtils::MinMaxValue MIN_MAX_NUMBER_OF_ITEMS = {.min = 100, .max = 2000};
+    static constexpr TestUtils::MinMaxValue MIN_MAX_NUMBER_OF_BUCKETS = {.min = 1, .max = 2048};
+    static constexpr TestUtils::MinMaxValue MIN_MAX_PAGE_SIZE = {.min = 512, .max = 10240};
+    Configurations::ExecutionMode backend;
 
     static void SetUpTestSuite()
     {
@@ -168,7 +169,7 @@ TEST_P(ChainedHashMapCustomValueTest, pagedVector)
         const auto numberOfRecordsExact = std::distance(recordValueExactStart, recordValueExactEnd);
 
         /// Acquiring a buffer to write the values to that has the needed size
-        const auto neededBytes = memoryProviderInputBuffer->getMemoryLayout()->getSchema()->getSchemaSizeInBytes() * numberOfRecordsExact;
+        const auto neededBytes = memoryProviderInputBuffer->getMemoryLayout()->getSchema().getSchemaSizeInBytes() * numberOfRecordsExact;
         auto outputBufferOpt = bufferManager->getUnpooledBuffer(neededBytes);
         if (not outputBufferOpt)
         {
@@ -181,7 +182,7 @@ TEST_P(ChainedHashMapCustomValueTest, pagedVector)
         writeAllRecordsIntoOutputBuffer(
             std::addressof(buffer), keyPositionInBuffer, std::addressof(outputBuffer), bufferManager.get(), std::addressof(hashMap));
         const auto writtenBytes
-            = outputBuffer.getNumberOfTuples() * memoryProviderInputBuffer->getMemoryLayout()->getSchema()->getSchemaSizeInBytes();
+            = outputBuffer.getNumberOfTuples() * memoryProviderInputBuffer->getMemoryLayout()->getSchema().getSchemaSizeInBytes();
         ASSERT_LE(writtenBytes, outputBuffer.getBufferSize());
         ASSERT_EQ(outputBuffer.getNumberOfTuples(), std::distance(recordValueExactStart, recordValueExactEnd));
 
@@ -235,7 +236,7 @@ INSTANTIATE_TEST_CASE_P(
               BasicType::UINT16,
               BasicType::UINT8,
               BasicType::FLOAT64}}),
-        ::testing::Values(Nautilus::Configurations::NautilusBackend::COMPILER, Nautilus::Configurations::NautilusBackend::INTERPRETER)),
+        ::testing::Values(Nautilus::Configurations::ExecutionMode::COMPILER, Nautilus::Configurations::ExecutionMode::INTERPRETER)),
     [](const testing::TestParamInfo<ChainedHashMapCustomValueTest::ParamType>& info)
     {
         const auto iteration = std::get<0>(info.param);

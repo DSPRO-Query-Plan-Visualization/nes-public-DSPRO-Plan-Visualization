@@ -13,7 +13,10 @@
 */
 
 
-#include <Operators/Serialization/DecomposedQueryPlanSerializationUtil.hpp>
+#include <cstddef>
+#include <Listeners/QueryLog.hpp>
+#include <Plans/LogicalPlan.hpp>
+#include <Serialization/QueryPlanSerializationUtil.hpp>
 #include <Util/Logger/Logger.hpp>
 #include <grpcpp/channel.h>
 #include <magic_enum/magic_enum.hpp>
@@ -24,12 +27,12 @@ GRPCClient::GRPCClient(std::shared_ptr<grpc::Channel> channel) : stub(WorkerRPCS
 {
 }
 
-size_t GRPCClient::registerQuery(const NES::DecomposedQueryPlan& queryPlan) const
+size_t GRPCClient::registerQuery(const NES::LogicalPlan& queryPlan) const
 {
     grpc::ClientContext context;
     RegisterQueryReply reply;
     RegisterQueryRequest request;
-    NES::DecomposedQueryPlanSerializationUtil::serializeDecomposedQueryPlan(queryPlan, request.mutable_decomposedqueryplan());
+    request.mutable_queryplan()->CopyFrom(NES::QueryPlanSerializationUtil::serializeQueryPlan(queryPlan));
     auto status = stub->RegisterQuery(&context, request, &reply);
     if (status.ok())
     {
@@ -67,7 +70,7 @@ void GRPCClient::start(size_t queryId) const
     }
 }
 
-QuerySummaryReply GRPCClient::status(size_t queryId) const
+NES::QuerySummary GRPCClient::status(size_t queryId) const
 {
     grpc::ClientContext context;
     QuerySummaryRequest request;
@@ -80,13 +83,37 @@ QuerySummaryReply GRPCClient::status(size_t queryId) const
     }
     else
     {
-        throw NES::QueryStopFailed(
+        throw NES::QueryStatusFailed(
             "Status: {}\nMessage: {}\nDetail: {}",
             magic_enum::enum_name(status.error_code()),
             status.error_message(),
             status.error_details());
     }
-    return response;
+
+    /// Convert the gRPC object to a C++ one
+    std::vector<NES::QueryRunSummary> runs;
+    for (auto run : response.runs())
+    {
+        const std::chrono::system_clock::time_point startTimePoint(std::chrono::milliseconds(run.startunixtimeinms()));
+        const std::chrono::system_clock::time_point runningTimePoint(std::chrono::milliseconds(run.runningunixtimeinms()));
+        const std::chrono::system_clock::time_point stopTimePoint(std::chrono::milliseconds(run.stopunixtimeinms()));
+        /// Creating a new QueryRunSummary
+        runs.emplace_back();
+        runs.back().start = startTimePoint;
+        runs.back().running = runningTimePoint;
+        runs.back().stop = stopTimePoint;
+
+        if (run.has_error())
+        {
+            const auto runError = run.error();
+            NES::Exception exception(runError.message(), runError.code());
+            runs.back().error = exception;
+        }
+    }
+    /// First, we need to cast the gRPC enum value to an int and then to the C++ enum
+    const auto queryStatus(static_cast<NES::QueryStatus>(static_cast<uint8_t>(response.status())));
+    NES::QuerySummary querySummary = {.queryId = NES::QueryId(response.queryid()), .currentStatus = queryStatus, .runs = runs};
+    return querySummary;
 }
 
 void GRPCClient::unregister(size_t queryId) const

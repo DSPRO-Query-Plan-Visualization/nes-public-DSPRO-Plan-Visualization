@@ -22,7 +22,7 @@ namespace NES
 {
 /// TODO #601 Refactor Identifiers.hpp
 
-/// Global Identifiers: These Identifierers are unique to the SingleNodeWorkers entire lifetime.
+/// Global Identifiers: These Identifiers are unique to the SingleNodeWorkers entire lifetime.
 /// There can never exist two objects with the same Identifier, regardless if the previous object has been destroyed
 using OperatorId = NESStrongType<uint64_t, struct OperatorId_, 0, 1>;
 using OriginId = NESStrongType<uint64_t, struct OriginId_, 0, 1>;

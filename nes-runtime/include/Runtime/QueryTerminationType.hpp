@@ -15,10 +15,13 @@
 #pragma once
 
 #include <ostream>
+#include <string>
 #include <stdint.h>
 #include <Util/Logger/Logger.hpp>
+#include <fmt/base.h>
+#include <fmt/format.h>
 
-namespace NES::Runtime
+namespace NES
 {
 
 enum class QueryTerminationType : uint8_t
@@ -50,17 +53,17 @@ static O& operator<<(O& os, const QueryTerminationType& type)
 namespace fmt
 {
 template <>
-struct formatter<NES::Runtime::QueryTerminationType> : formatter<std::string>
+struct formatter<NES::QueryTerminationType> : formatter<std::string>
 {
-    auto format(const NES::Runtime::QueryTerminationType& termination_type, format_context& ctx) const -> decltype(ctx.out())
+    static auto format(const NES::QueryTerminationType& terminationType, format_context& ctx) -> decltype(ctx.out())
     {
-        switch (termination_type)
+        switch (terminationType)
         {
-            case NES::Runtime::QueryTerminationType::Graceful:
+            case NES::QueryTerminationType::Graceful:
                 return fmt::format_to(ctx.out(), "Graceful");
-            case NES::Runtime::QueryTerminationType::HardStop:
+            case NES::QueryTerminationType::HardStop:
                 return fmt::format_to(ctx.out(), "HardStop");
-            case NES::Runtime::QueryTerminationType::Failure:
+            case NES::QueryTerminationType::Failure:
                 return fmt::format_to(ctx.out(), "Failure");
             default:
                 return fmt::format_to(ctx.out(), "Invalid");

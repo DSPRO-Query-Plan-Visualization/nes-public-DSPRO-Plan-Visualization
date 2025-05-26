@@ -42,6 +42,7 @@
 #include <CSVInputFormatter.hpp>
 #include <ErrorHandling.hpp>
 #include <InputFormatterRegistry.hpp>
+#include <PipelineExecutionContext.hpp>
 #include <SequenceShredder.hpp>
 #include <Common/PhysicalTypes/BasicPhysicalType.hpp>
 #include <Common/PhysicalTypes/DefaultPhysicalTypeFactory.hpp>
@@ -132,7 +133,7 @@ public:
         }
     }
 
-    void checkAndHandleFullBuffer(Runtime::Execution::PipelineExecutionContext& pipelineExecutionContext)
+    void checkAndHandleFullBuffer(PipelineExecutionContext& pipelineExecutionContext)
     {
         const auto availableBytes = tupleBufferFormatted.getBufferSize() - currentFieldOffsetTBFormatted;
         if (const auto isFull = availableBytes < tupleSizeInBytes)
@@ -144,7 +145,7 @@ public:
             /// As we are not done with the current sequence number, we need to emit the TBF with the lastChunk flag set to false.
             auto tbf = getTupleBufferFormatted();
             tbf.setLastChunk(false);
-            pipelineExecutionContext.emitBuffer(tbf, NES::Runtime::Execution::PipelineExecutionContext::ContinuationPolicy::POSSIBLE);
+            pipelineExecutionContext.emitBuffer(tbf, NES::PipelineExecutionContext::ContinuationPolicy::POSSIBLE);
 
 
             /// We need to increment the chunk number as we are not done with the current sequence number.
@@ -156,7 +157,7 @@ public:
     }
 
     void processCurrentBuffer(
-        Runtime::Execution::PipelineExecutionContext& pipelineExecutionContext,
+        PipelineExecutionContext& pipelineExecutionContext,
         const std::string& fieldDelimiter,
         const std::vector<CSVInputFormatter::CastFunctionSignature>& fieldParseFunctions,
         const std::vector<size_t>& fieldSizes)
@@ -400,9 +401,9 @@ CSVInputFormatter::CSVInputFormatter(const Schema& schema, std::string tupleDeli
     std::vector<std::shared_ptr<PhysicalType>> physicalTypes;
     const auto defaultPhysicalTypeFactory = DefaultPhysicalTypeFactory();
     physicalTypes.reserve(schema.getFieldCount());
-    for (const std::shared_ptr<AttributeField>& field : schema)
+    for (const AttributeField& field : schema)
     {
-        physicalTypes.emplace_back(defaultPhysicalTypeFactory.getPhysicalType(field->getDataType()));
+        physicalTypes.emplace_back(defaultPhysicalTypeFactory.getPhysicalType(field.getDataType()));
     }
 
     /// Since we know the schema, we can create a vector that contains a function that converts the string representation of a field value
@@ -448,7 +449,7 @@ CSVInputFormatter::~CSVInputFormatter() = default;
 
 void CSVInputFormatter::parseTupleBufferRaw(
     const NES::Memory::TupleBuffer& rawTB,
-    Runtime::Execution::PipelineExecutionContext& pipelineExecutionContext,
+    PipelineExecutionContext& pipelineExecutionContext,
     const size_t numBytesInRawTB,
     SequenceShredder& sequenceShredder)
 {
@@ -457,7 +458,7 @@ void CSVInputFormatter::parseTupleBufferRaw(
     const auto isInRange = sequenceShredder.isInRange(rawTB.getSequenceNumber().getRawValue());
     if (not(isInRange))
     {
-        pipelineExecutionContext.emitBuffer(rawTB, NES::Runtime::Execution::PipelineExecutionContext::ContinuationPolicy::REPEAT);
+        pipelineExecutionContext.emitBuffer(rawTB, NES::PipelineExecutionContext::ContinuationPolicy::REPEAT);
         return;
     }
 
@@ -521,8 +522,7 @@ void CSVInputFormatter::parseTupleBufferRaw(
         auto finalFormattedBuffer = progressTracker.getTupleBufferFormatted();
         finalFormattedBuffer.setNumberOfTuples(progressTracker.getNumTuplesInTBFormatted());
         finalFormattedBuffer.setLastChunk(true);
-        pipelineExecutionContext.emitBuffer(
-            finalFormattedBuffer, NES::Runtime::Execution::PipelineExecutionContext::ContinuationPolicy::POSSIBLE);
+        pipelineExecutionContext.emitBuffer(finalFormattedBuffer, NES::PipelineExecutionContext::ContinuationPolicy::POSSIBLE);
     }
     else
     {
@@ -546,8 +546,7 @@ void CSVInputFormatter::parseTupleBufferRaw(
         auto finalFormattedBuffer = progressTracker.getTupleBufferFormatted();
         finalFormattedBuffer.setNumberOfTuples(finalFormattedBuffer.getNumberOfTuples() + 1);
         finalFormattedBuffer.setLastChunk(true);
-        pipelineExecutionContext.emitBuffer(
-            finalFormattedBuffer, NES::Runtime::Execution::PipelineExecutionContext::ContinuationPolicy::POSSIBLE);
+        pipelineExecutionContext.emitBuffer(finalFormattedBuffer, NES::PipelineExecutionContext::ContinuationPolicy::POSSIBLE);
     }
 }
 
@@ -556,7 +555,7 @@ CSVInputFormatter::FormattedTupleIs CSVInputFormatter::processPartialTuple(
     const size_t partialTupleEndIdx,
     const std::vector<SequenceShredder::StagedBuffer>& buffersToFormat,
     ProgressTracker& progressTracker,
-    Runtime::Execution::PipelineExecutionContext& pipelineExecutionContext)
+    PipelineExecutionContext& pipelineExecutionContext)
 {
     PRECONDITION(partialTupleStartIdx < partialTupleEndIdx, "Partial tuple start index must be smaller than the end index.");
     PRECONDITION(partialTupleEndIdx <= buffersToFormat.size(), "Partial tuple end index must be smaller than the size of the buffers.");
@@ -600,7 +599,7 @@ CSVInputFormatter::FormattedTupleIs CSVInputFormatter::processPartialTuple(
 }
 
 void CSVInputFormatter::flushFinalTuple(
-    OriginId originId, NES::Runtime::Execution::PipelineExecutionContext& pipelineExecutionContext, SequenceShredder& sequenceShredder)
+    OriginId originId, NES::PipelineExecutionContext& pipelineExecutionContext, SequenceShredder& sequenceShredder)
 {
     const auto [resultBuffers, sequenceNumberToUseForFlushedTuple] = sequenceShredder.flushFinalPartialTuple();
     const auto flushedBuffers = std::move(resultBuffers.stagedBuffers);
@@ -627,8 +626,7 @@ void CSVInputFormatter::flushFinalTuple(
         auto finalFormattedBuffer = progressTracker.getTupleBufferFormatted();
         finalFormattedBuffer.setNumberOfTuples(finalFormattedBuffer.getNumberOfTuples() + 1);
         finalFormattedBuffer.setLastChunk(true);
-        pipelineExecutionContext.emitBuffer(
-            finalFormattedBuffer, NES::Runtime::Execution::PipelineExecutionContext::ContinuationPolicy::POSSIBLE);
+        pipelineExecutionContext.emitBuffer(finalFormattedBuffer, NES::PipelineExecutionContext::ContinuationPolicy::POSSIBLE);
     }
 }
 size_t CSVInputFormatter::getSizeOfTupleDelimiter()

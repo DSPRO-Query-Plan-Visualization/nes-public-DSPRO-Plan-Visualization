@@ -13,13 +13,26 @@
 */
 
 #pragma once
+#include <atomic>
 #include <cstdint>
+#include <Identifiers/NESStrongType.hpp>
 #include <Runtime/QueryTerminationType.hpp>
 
-namespace NES::Runtime::Execution
+namespace NES
 {
 /// Forward declaration of PipelineExecutionContext, which directly includes OperatorHandler
 class PipelineExecutionContext;
+
+using OperatorHandlerId = NESStrongType<uint64_t, struct OperatorHandlerId_, 0, 1>;
+static constexpr OperatorHandlerId INVALID_OPERATOR_HANDLER_ID = INVALID<OperatorHandlerId>;
+static constexpr OperatorHandlerId INITIAL_OPERATOR_HANDLER_ID = INITIAL<OperatorHandlerId>;
+
+inline OperatorHandlerId getNextOperatorHandlerId()
+{
+    static std::atomic_uint64_t id = INITIAL_OPERATOR_HANDLER_ID.getRawValue();
+    return OperatorHandlerId(id++);
+}
+
 /**
  * @brief Interface to handle specific operator state.
  */
@@ -32,7 +45,7 @@ public:
 
     virtual void start(PipelineExecutionContext& pipelineExecutionContext, uint32_t localStateVariableId) = 0;
 
-    virtual void stop(Runtime::QueryTerminationType terminationType, PipelineExecutionContext& pipelineExecutionContext) = 0;
+    virtual void stop(QueryTerminationType terminationType, PipelineExecutionContext& pipelineExecutionContext) = 0;
 };
 
 }

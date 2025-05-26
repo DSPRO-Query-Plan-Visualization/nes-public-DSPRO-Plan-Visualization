@@ -12,9 +12,11 @@
     limitations under the License.
 */
 
+#include <memory>
 #include <string>
 #include <Util/Logger/Logger.hpp>
 #include <fmt/core.h>
+#include <Common/PhysicalTypes/PhysicalType.hpp>
 #include <Common/PhysicalTypes/VariableSizedDataPhysicalType.hpp>
 
 namespace NES
@@ -30,6 +32,11 @@ std::string VariableSizedDataPhysicalType::convertRawToString(const void* data) 
 {
     /// We always read the exact number of bytes contained by the VariableSizedDataType.
     return convertRawToStringWithoutFill(data);
+}
+
+std::unique_ptr<PhysicalType> VariableSizedDataPhysicalType::clone() const
+{
+    return std::make_unique<VariableSizedDataPhysicalType>(*this);
 }
 
 std::string VariableSizedDataPhysicalType::convertRawToStringWithoutFill(const void* data) const noexcept

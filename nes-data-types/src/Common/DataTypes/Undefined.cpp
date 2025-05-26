@@ -13,6 +13,7 @@
 */
 
 #include <memory>
+#include <string>
 #include <Util/Common.hpp>
 #include <DataTypeRegistry.hpp>
 #include <Common/DataTypes/DataTypeProvider.hpp>
@@ -26,11 +27,11 @@ bool Undefined::operator==(const DataType& other) const
     return dynamic_cast<const Undefined*>(&other) != nullptr;
 }
 
-std::shared_ptr<DataType> Undefined::join(std::shared_ptr<DataType>)
+std::shared_ptr<DataType> Undefined::join(const DataType&) const
 {
     return DataTypeProvider::provideDataType(LogicalType::UNDEFINED);
 }
-std::string Undefined::toString()
+std::string Undefined::toString() const
 {
     return "Undefined";
 }

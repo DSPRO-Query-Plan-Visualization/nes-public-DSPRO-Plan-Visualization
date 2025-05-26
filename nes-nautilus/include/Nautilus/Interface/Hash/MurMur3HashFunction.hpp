@@ -12,6 +12,7 @@
     limitations under the License.
 */
 #pragma once
+#include <memory>
 #include <Nautilus/DataTypes/VarVal.hpp>
 #include <Nautilus/Interface/Hash/HashFunction.hpp>
 
@@ -26,6 +27,8 @@ public:
     /// Seed as an initialisation.
     const uint64_t SEED = 902850234;
     [[nodiscard]] HashValue init() const override;
+
+    [[nodiscard]] std::unique_ptr<HashFunction> clone() const override;
 
 protected:
     /// Calculates the hash of value and xor-es it with hash

@@ -18,14 +18,16 @@
 #include <fstream>
 #include <numeric>
 #include <Identifiers/Identifiers.hpp>
-#include <Nautilus/NautilusBackend.hpp>
+
 #include <Runtime/BufferManager.hpp>
 #include <Sinks/SinkDescriptor.hpp>
+#include <Util/ExecutionMode.hpp>
 #include <fmt/core.h>
 #include <gtest/gtest.h>
 #include <BaseIntegrationTest.hpp>
 #include <GrpcService.hpp>
 #include <IntegrationTestUtil.hpp>
+#include <SerializableQueryPlan.pb.h>
 #include <SingleNodeWorkerRPCService.pb.h>
 
 
@@ -77,7 +79,7 @@ TEST_P(SingleNodeIntegrationTest, IntegrationTestWithSourcesCSV)
     const std::string queryInputFile = fmt::format("{}.bin", queryName);
     IntegrationTestUtil::removeFile(testSpecificResultFileName);
 
-    SerializableDecomposedQueryPlan queryPlan;
+    SerializableQueryPlan queryPlan;
 
     if (!IntegrationTestUtil::loadFile(queryPlan, queryInputFile, dataInputFile, testSpecificDataFileName))
     {
@@ -87,7 +89,7 @@ TEST_P(SingleNodeIntegrationTest, IntegrationTestWithSourcesCSV)
     IntegrationTestUtil::replaceInputFileInFileSources(queryPlan, testSpecificDataFileName);
 
     Configuration::SingleNodeWorkerConfiguration configuration{};
-    configuration.workerConfiguration.queryCompiler.nautilusBackend = Nautilus::Configurations::NautilusBackend::COMPILER;
+    configuration.workerConfiguration.queryOptimizer.executionMode = Nautilus::Configurations::ExecutionMode::COMPILER;
 
     GRPCServer uut{SingleNodeWorker{configuration}};
 

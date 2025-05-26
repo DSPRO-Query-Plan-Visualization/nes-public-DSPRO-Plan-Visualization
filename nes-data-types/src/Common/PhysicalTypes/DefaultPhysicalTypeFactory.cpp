@@ -30,27 +30,27 @@ namespace NES
 
 DefaultPhysicalTypeFactory::DefaultPhysicalTypeFactory() = default;
 
-std::shared_ptr<PhysicalType> DefaultPhysicalTypeFactory::getPhysicalType(std::shared_ptr<DataType> dataType) const
+std::unique_ptr<PhysicalType> DefaultPhysicalTypeFactory::getPhysicalType(std::shared_ptr<DataType> dataType) const
 {
-    if (NES::Util::instanceOf<Boolean>(dataType))
+    if (const auto booleanPtr = std::dynamic_pointer_cast<Boolean>(dataType))
     {
         return BasicPhysicalType::create(dataType, BasicPhysicalType::NativeType::BOOLEAN);
     }
-    else if (NES::Util::instanceOf<Integer>(dataType))
+    if (const auto integerPtr = std::dynamic_pointer_cast<Integer>(dataType))
     {
         return getPhysicalType(DataType::as<Integer>(dataType));
     }
-    else if (NES::Util::instanceOf<Float>(dataType))
+    if (const auto floatPtr = std::dynamic_pointer_cast<Float>(dataType))
     {
         return getPhysicalType(DataType::as<Float>(dataType));
     }
-    else if (NES::Util::instanceOf<Char>(dataType))
+    if (const auto charPtr = std::dynamic_pointer_cast<Char>(dataType))
     {
-        return BasicPhysicalType::create(DataType::as<Char>(dataType), BasicPhysicalType::NativeType::CHAR);
+        return BasicPhysicalType::create(dataType, BasicPhysicalType::NativeType::CHAR);
     }
-    else if (NES::Util::instanceOf<VariableSizedDataType>(dataType))
+    if (const auto varSizedPtr = std::dynamic_pointer_cast<VariableSizedDataType>(dataType))
     {
-        return VariableSizedDataPhysicalType::create(DataType::as<VariableSizedDataType>(dataType));
+        return VariableSizedDataPhysicalType::create(dataType);
     }
     else
     {
@@ -58,7 +58,8 @@ std::shared_ptr<PhysicalType> DefaultPhysicalTypeFactory::getPhysicalType(std::s
     }
 }
 
-std::shared_ptr<PhysicalType> DefaultPhysicalTypeFactory::getPhysicalType(const std::shared_ptr<Integer>& integer)
+
+std::unique_ptr<PhysicalType> DefaultPhysicalTypeFactory::getPhysicalType(const std::shared_ptr<Integer>& integer)
 {
     using enum NES::BasicPhysicalType::NativeType;
     if (!integer->getIsSigned())
@@ -109,7 +110,7 @@ std::shared_ptr<PhysicalType> DefaultPhysicalTypeFactory::getPhysicalType(const 
     }
 }
 
-std::shared_ptr<PhysicalType> DefaultPhysicalTypeFactory::getPhysicalType(const std::shared_ptr<Float>& floatType)
+std::unique_ptr<PhysicalType> DefaultPhysicalTypeFactory::getPhysicalType(const std::shared_ptr<Float>& floatType)
 {
     if (floatType->getBits() <= 32)
     {

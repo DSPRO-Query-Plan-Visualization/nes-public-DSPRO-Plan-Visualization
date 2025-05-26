@@ -24,6 +24,7 @@
 #include <queue>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 #include <Identifiers/Identifiers.hpp>
@@ -38,7 +39,7 @@
 #include <PipelineExecutionContext.hpp>
 
 
-namespace NES::Runtime::Execution
+namespace NES
 {
 
 /// Mocks 'PipelineExecutionContext'. Allows to control how to emit and allocate buffers. Currently, when getting data in its emit function,
@@ -95,8 +96,9 @@ public:
     [[nodiscard]] uint64_t getNumberOfWorkerThreads() const override { return 0; }; /// dummy implementation for  pure virtual function
     [[nodiscard]] std::shared_ptr<Memory::AbstractBufferProvider> getBufferManager() const override { return bufferManager; }
     [[nodiscard]] PipelineId getPipelineId() const override { return pipelineId; }
-    std::vector<std::shared_ptr<OperatorHandler>>& getOperatorHandlers() override { return operatorHandlers; }
-    void setOperatorHandlers(std::vector<std::shared_ptr<OperatorHandler>>& operatorHandlers) override
+
+    std::unordered_map<OperatorHandlerId, std::shared_ptr<OperatorHandler>>& getOperatorHandlers() override { return operatorHandlers; };
+    void setOperatorHandlers(std::unordered_map<OperatorHandlerId, std::shared_ptr<OperatorHandler>>& operatorHandlers) override
     {
         this->operatorHandlers = operatorHandlers;
     }
@@ -107,7 +109,7 @@ public:
 private:
     std::function<void()> repeatTaskCallback;
     std::shared_ptr<Memory::AbstractBufferProvider> bufferManager;
-    std::vector<std::shared_ptr<OperatorHandler>> operatorHandlers;
+    std::unordered_map<OperatorHandlerId, std::shared_ptr<OperatorHandler>> operatorHandlers;
     /// Different threads have different TestPipelineExecutionContexts. All threads share the same pointer to the result buffers.
     /// Each thread writes its own results in a dedicated slot. This keeps results in a single place and does not require awkward logic
     /// to get the result buffers out of the TestPipelineExecutionContexts.

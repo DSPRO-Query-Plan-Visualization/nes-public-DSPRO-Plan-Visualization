@@ -35,7 +35,7 @@ class TestTupleBufferTest : public Testing::BaseUnitTest, public testing::WithPa
 {
 public:
     std::shared_ptr<Memory::BufferManager> bufferManager;
-    std::shared_ptr<Schema> schema, varSizedDataSchema;
+    Schema schema, varSizedDataSchema;
     std::unique_ptr<TestTupleBuffer> testBuffer, testBufferVarSize;
 
     static void SetUpTestCase()
@@ -48,16 +48,16 @@ public:
         Testing::BaseUnitTest::SetUp();
         const auto memoryLayout = GetParam();
         bufferManager = Memory::BufferManager::create(4096, 10);
-        schema = Schema::create(memoryLayout)
-                     ->addField("test$t1", BasicType::UINT16)
-                     ->addField("test$t2", BasicType::BOOLEAN)
-                     ->addField("test$t3", BasicType::FLOAT64);
+        schema = Schema(memoryLayout)
+                     .addField("test$t1", BasicType::UINT16)
+                     .addField("test$t2", BasicType::BOOLEAN)
+                     .addField("test$t3", BasicType::FLOAT64);
 
-        varSizedDataSchema = Schema::create(memoryLayout)
-                                 ->addField("test$t1", BasicType::UINT16)
-                                 ->addField("test$t2", DataTypeProvider::provideDataType(LogicalType::VARSIZED))
-                                 ->addField("test$t3", BasicType::FLOAT64)
-                                 ->addField("test$t4", DataTypeProvider::provideDataType(LogicalType::VARSIZED));
+        varSizedDataSchema = Schema(memoryLayout)
+                                 .addField("test$t1", BasicType::UINT16)
+                                 .addField("test$t2", DataTypeProvider::provideDataType(LogicalType::VARSIZED))
+                                 .addField("test$t3", BasicType::FLOAT64)
+                                 .addField("test$t4", DataTypeProvider::provideDataType(LogicalType::VARSIZED));
 
         auto tupleBuffer = bufferManager->getBufferBlocking();
         auto tupleBufferVarSizedData = bufferManager->getBufferBlocking();
@@ -221,7 +221,11 @@ TEST_P(TestTupleBufferTest, countOccurrencesTest)
         uint64_t occurrences;
     };
 
-    std::vector<TupleOccurrences> vec = {{{1, true, rand()}, 5}, {{2, false, rand()}, 6}, {{3, false, rand()}, 20}, {{4, true, rand()}, 5}};
+    std::vector<TupleOccurrences> vec
+        = {{.tuple = {1, true, rand()}, .occurrences = 5},
+           {.tuple = {2, false, rand()}, .occurrences = 6},
+           {.tuple = {3, false, rand()}, .occurrences = 20},
+           {.tuple = {4, true, rand()}, .occurrences = 5}};
 
     auto posTuple = 0_u64;
     for (auto item : vec)
@@ -247,10 +251,10 @@ TEST_P(TestTupleBufferTest, countOccurrencesTestVarSizeData)
     };
 
     std::vector<TupleOccurrences> vec
-        = {{{1, "true", rand(), "aaaaa"}, 5},
-           {{2, "false", rand(), "bbbbb"}, 6},
-           {{4, "true", rand(), "ccccc"}, 20},
-           {{3, "false", rand(), "ddddd"}, 5}};
+        = {{.tuple = {1, "true", rand(), "aaaaa"}, .occurrences = 5},
+           {.tuple = {2, "false", rand(), "bbbbb"}, .occurrences = 6},
+           {.tuple = {4, "true", rand(), "ccccc"}, .occurrences = 20},
+           {.tuple = {3, "false", rand(), "ddddd"}, .occurrences = 5}};
 
     auto posTuple = 0_u64;
     for (auto item : vec)

@@ -12,16 +12,21 @@
     limitations under the License.
 */
 
+#include <sstream>
 #include <API/Schema.hpp>
+#include <Serialization/SchemaSerializationUtil.hpp>
 #include <Sources/SourceDescriptor.hpp>
+#include <Util/PlanRenderer.hpp>
 #include <Util/Strings.hpp>
 #include <fmt/format.h>
+#include <ProtobufHelper.hpp> /// NOLINT
+#include <SerializableOperator.pb.h>
 
 namespace NES::Sources
 {
 
 SourceDescriptor::SourceDescriptor(
-    std::shared_ptr<Schema> schema,
+    Schema schema,
     std::string logicalSourceName,
     std::string sourceType,
     const int numberOfBuffersInSourceLocalBufferPool,
@@ -38,7 +43,7 @@ SourceDescriptor::SourceDescriptor(
 
 std::ostream& operator<<(std::ostream& out, const SourceDescriptor& sourceDescriptor)
 {
-    const auto schemaString = ((sourceDescriptor.schema) ? sourceDescriptor.schema->toString() : "NULL");
+    const auto schemaString = sourceDescriptor.schema.toString();
     const auto parserConfigString = fmt::format(
         "type: {}, tupleDelimiter: '{}', stringDelimiter: '{}'",
         sourceDescriptor.parserConfig.parserType,
@@ -53,9 +58,58 @@ std::ostream& operator<<(std::ostream& out, const SourceDescriptor& sourceDescri
                sourceDescriptor.toStringConfig());
 }
 
+std::string SourceDescriptor::explain(ExplainVerbosity verbosity) const
+{
+    std::stringstream stringstream;
+    if (verbosity == ExplainVerbosity::Debug)
+    {
+        const auto schemaString = schema.toString();
+        const auto parserConfigString = fmt::format(
+            "type: {}, tupleDelimiter: '{}', stringDelimiter: '{}'",
+            parserConfig.parserType,
+            Util::escapeSpecialCharacters(parserConfig.tupleDelimiter),
+            Util::escapeSpecialCharacters(parserConfig.fieldDelimiter));
+        stringstream << fmt::format(
+            "SourceDescriptor( logicalSourceName: {}, sourceType: {}, schema: {}, parserConfig: {}, config: {})",
+            logicalSourceName,
+            sourceType,
+            schemaString,
+            parserConfigString,
+            toStringConfig());
+    }
+    else if (verbosity == ExplainVerbosity::Short)
+    {
+        stringstream << fmt::format("{}", logicalSourceName);
+    }
+    return stringstream.str();
+}
+
 bool operator==(const SourceDescriptor& lhs, const SourceDescriptor& rhs)
 {
     return lhs.schema == rhs.schema && lhs.sourceType == rhs.sourceType && lhs.config == rhs.config;
 }
 
+SerializableSourceDescriptor SourceDescriptor::serialize() const
+{
+    SerializableSourceDescriptor serializableSourceDescriptor;
+    SchemaSerializationUtil::serializeSchema(schema, serializableSourceDescriptor.mutable_sourceschema());
+    serializableSourceDescriptor.set_logicalsourcename(logicalSourceName);
+    serializableSourceDescriptor.set_sourcetype(sourceType);
+    serializableSourceDescriptor.set_numberofbuffersinsourcelocalbufferpool(numberOfBuffersInSourceLocalBufferPool);
+
+    /// Serialize parser config.
+    auto* const serializedParserConfig = NES::ParserConfig().New();
+    serializedParserConfig->set_type(parserConfig.parserType);
+    serializedParserConfig->set_tupledelimiter(parserConfig.tupleDelimiter);
+    serializedParserConfig->set_fielddelimiter(parserConfig.fieldDelimiter);
+    serializableSourceDescriptor.set_allocated_parserconfig(serializedParserConfig);
+
+    /// Iterate over SourceDescriptor config and serialize all key-value pairs.
+    for (const auto& [key, value] : config)
+    {
+        auto* kv = serializableSourceDescriptor.mutable_config();
+        kv->emplace(key, descriptorConfigTypeToProto(value));
+    }
+    return serializableSourceDescriptor;
+}
 }

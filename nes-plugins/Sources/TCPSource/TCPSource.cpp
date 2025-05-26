@@ -130,7 +130,7 @@ bool TCPSource::tryToConnect(const addrinfo* result, const int flags)
 
         /// Set the timeout for the connect attempt
         fd_set fdset;
-        timeval timeValue{socketConnectDefaultTimeout.count(), IMPLICIT_TIMEOUT_USEC};
+        timeval timeValue{.tv_sec = socketConnectDefaultTimeout.count(), .tv_usec = IMPLICIT_TIMEOUT_USEC};
 
         FD_ZERO(&fdset);
         FD_SET(sockfd, &fdset);
@@ -264,7 +264,7 @@ bool TCPSource::fillBuffer(NES::Memory::TupleBuffer& tupleBuffer, size_t& numRec
 
 NES::Configurations::DescriptorConfig::Config TCPSource::validateAndFormat(std::unordered_map<std::string, std::string> config)
 {
-    return Configurations::DescriptorConfig::validateAndFormat<ConfigParametersTCP>(std::move(config), name());
+    return NES::Configurations::DescriptorConfig::validateAndFormat<ConfigParametersTCP>(std::move(config), name());
 }
 
 void TCPSource::close()

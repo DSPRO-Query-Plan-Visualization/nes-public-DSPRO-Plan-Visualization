@@ -20,13 +20,15 @@
 #include <thread>
 #include <vector>
 #include <Identifiers/Identifiers.hpp>
-#include <Nautilus/NautilusBackend.hpp>
+
+#include <Util/ExecutionMode.hpp>
 #include <boost/asio.hpp>
 #include <fmt/core.h>
 #include <gtest/gtest.h>
 #include <BaseIntegrationTest.hpp>
 #include <GrpcService.hpp>
 #include <IntegrationTestUtil.hpp>
+#include <SerializableQueryPlan.pb.h>
 #include <SingleNodeWorkerRPCService.pb.h>
 
 namespace NES::Testing
@@ -113,7 +115,7 @@ TEST_P(SingleNodeIntegrationTest, IntegrationTestWithSourcesTCP)
     const std::string queryInputFile = fmt::format("{}.bin", queryName);
     IntegrationTestUtil::removeFile(testSpecificResultFileName);
 
-    SerializableDecomposedQueryPlan queryPlan;
+    SerializableQueryPlan queryPlan;
     if (!IntegrationTestUtil::loadFile(queryPlan, queryInputFile))
     {
         GTEST_SKIP();
@@ -121,7 +123,7 @@ TEST_P(SingleNodeIntegrationTest, IntegrationTestWithSourcesTCP)
     IntegrationTestUtil::replaceFileSinkPath(queryPlan, testSpecificResultFileName);
 
     Configuration::SingleNodeWorkerConfiguration configuration{};
-    configuration.workerConfiguration.queryCompiler.nautilusBackend = Nautilus::Configurations::NautilusBackend::COMPILER;
+    configuration.workerConfiguration.queryOptimizer.executionMode = Nautilus::Configurations::ExecutionMode::COMPILER;
 
     GRPCServer uut{SingleNodeWorker{configuration}};
 

@@ -15,9 +15,10 @@
 #pragma once
 
 #include <memory>
-#include <Plans/Query/QueryPlan.hpp>
+#include <string_view>
+#include <Plans/LogicalPlan.hpp>
 
 namespace NES::AntlrSQLQueryParser
 {
-std::shared_ptr<QueryPlan> createLogicalQueryPlanFromSQLString(std::string_view queryString);
+LogicalPlan createLogicalQueryPlanFromSQLString(std::string_view queryString);
 }

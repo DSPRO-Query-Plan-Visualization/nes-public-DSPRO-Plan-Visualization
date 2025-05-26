@@ -13,6 +13,7 @@
 */
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <Nautilus/Interface/Hash/HashFunction.hpp>
 #include <Nautilus/Interface/Hash/MurMur3HashFunction.hpp>
 #include <nautilus/function.hpp>
@@ -24,6 +25,11 @@ namespace NES::Nautilus::Interface
 HashFunction::HashValue MurMur3HashFunction::init() const
 {
     return SEED;
+}
+
+std::unique_ptr<HashFunction> MurMur3HashFunction::clone() const
+{
+    return std::make_unique<MurMur3HashFunction>(*this);
 }
 
 /// Hash Function that implements murmurhas3 by Robin-Hood-Hashing:

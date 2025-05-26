@@ -8,6 +8,7 @@ ARG UID=1000
 ARG GID=1000
 ARG USERNAME=ubuntu
 ARG ROOTLESS=false
+
 RUN (${ROOTLESS} || (echo "uid: ${UID} gid ${GID} username ${USERNAME}" && \
     (delgroup ubuntu || true) && \
     (deluser ubuntu || true) && \

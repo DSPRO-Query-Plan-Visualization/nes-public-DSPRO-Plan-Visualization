@@ -18,7 +18,7 @@
 #include <ostream>
 #include <Util/Logger/Formatter.hpp>
 
-namespace NES::Runtime
+namespace NES
 {
 
 class Timestamp
@@ -30,18 +30,13 @@ public:
 
     explicit constexpr Timestamp(const Underlying value) : value(value) { }
 
-    Timestamp operator+(const uint64_t offset) const { return Timestamp(value + offset); }
-
-    Timestamp operator+=(const uint64_t offset) const { return Timestamp(value + offset); }
-
-    Timestamp operator-(const uint64_t offset) const { return Timestamp(value - offset); }
-
-    Timestamp operator-=(const uint64_t offset) const { return Timestamp(value - offset); }
-
+    Timestamp operator+(const Underlying offset) const { return Timestamp(value + offset); }
+    Timestamp operator+=(const Underlying offset) const { return Timestamp(value + offset); }
+    Timestamp operator-(const Underlying offset) const { return Timestamp(value - offset); }
+    Timestamp operator-(const Timestamp other) const { return Timestamp(value - other.value); }
+    Timestamp operator-=(const Underlying offset) const { return Timestamp(value - offset); }
     friend std::ostream& operator<<(std::ostream& os, const Timestamp& timestamp) { return os << timestamp.value; }
-
-    [[nodiscard]] uint64_t getRawValue() const { return value; }
-
+    [[nodiscard]] Underlying getRawValue() const { return value; }
     friend constexpr std::strong_ordering operator<=>(const Timestamp& lhs, const Timestamp& rhs) = default;
 
 private:
@@ -51,4 +46,4 @@ private:
 
 }
 
-FMT_OSTREAM(NES::Runtime::Timestamp);
+FMT_OSTREAM(NES::Timestamp);

@@ -23,9 +23,11 @@
 #include <string_view>
 #include <vector>
 #include <API/Schema.hpp>
+#include <Identifiers/Identifiers.hpp>
 #include <InputFormatters/InputFormatter.hpp>
 #include <Runtime/AbstractBufferProvider.hpp>
 #include <Runtime/TupleBuffer.hpp>
+#include <PipelineExecutionContext.hpp>
 #include <SequenceShredder.hpp>
 
 namespace NES::InputFormatters
@@ -61,16 +63,14 @@ public:
 
     void parseTupleBufferRaw(
         const Memory::TupleBuffer& rawTB,
-        Runtime::Execution::PipelineExecutionContext& pipelineExecutionContext,
+        PipelineExecutionContext& pipelineExecutionContext,
         size_t numBytesInRawTB,
         SequenceShredder& sequenceShredder) override;
 
     /// Currently allocates new buffer if there is a trailing tuple. Would require keeping state between potentially different threads otherwise,
     /// since the stop call of the InputFormatterTask (pipeline) triggers the flush call.
-    void flushFinalTuple(
-        OriginId originId,
-        Runtime::Execution::PipelineExecutionContext& pipelineExecutionContext,
-        SequenceShredder& sequenceShredder) override;
+    void
+    flushFinalTuple(OriginId originId, PipelineExecutionContext& pipelineExecutionContext, SequenceShredder& sequenceShredder) override;
 
     size_t getSizeOfTupleDelimiter() override;
     size_t getSizeOfFieldDelimiter() override;
@@ -89,7 +89,7 @@ private:
         const size_t partialTupleEndIdx,
         const std::vector<SequenceShredder::StagedBuffer>& buffersToFormat,
         ProgressTracker& progressTracker,
-        Runtime::Execution::PipelineExecutionContext& pipelineExecutionContext);
+        PipelineExecutionContext& pipelineExecutionContext);
 };
 
 }

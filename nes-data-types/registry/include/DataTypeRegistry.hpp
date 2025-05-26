@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <Util/Registry.hpp>
 #include <Common/DataTypes/DataType.hpp>
@@ -21,7 +22,7 @@
 namespace NES
 {
 
-using DataTypeRegistryReturnType = std::unique_ptr<DataType>;
+using DataTypeRegistryReturnType = std::shared_ptr<DataType>;
 struct DataTypeRegistryArguments
 {
 };

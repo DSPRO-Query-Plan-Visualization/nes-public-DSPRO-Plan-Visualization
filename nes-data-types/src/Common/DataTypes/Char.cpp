@@ -13,6 +13,7 @@
 */
 
 #include <memory>
+#include <string>
 #include <Util/Common.hpp>
 #include <magic_enum/magic_enum.hpp>
 #include <DataTypeRegistry.hpp>
@@ -28,16 +29,16 @@ bool Char::operator==(const NES::DataType& other) const
     return dynamic_cast<const Char*>(&other) != nullptr;
 }
 
-std::shared_ptr<DataType> Char::join(const std::shared_ptr<DataType> otherDataType)
+std::shared_ptr<DataType> Char::join(const DataType& otherDataType) const
 {
-    if (NES::Util::instanceOf<Char>(otherDataType))
+    if (dynamic_cast<const Char*>(&otherDataType) != nullptr)
     {
         return DataTypeProvider::provideDataType(LogicalType::CHAR);
     }
     return DataTypeProvider::provideDataType(LogicalType::UNDEFINED);
 }
 
-std::string Char::toString()
+std::string Char::toString() const
 {
     return std::string(magic_enum::enum_name(BasicType::CHAR));
 }
