@@ -83,22 +83,25 @@ std::vector<LoadedQueryPlan> loadFromSLTFile(
     parser.registerOnCSVSourceCallback(
         [&](SystestParser::CSVSource&& source)
         {
-            config.logical.emplace_back(CLI::LogicalSource{
-                .name = source.name,
-                .schema = [&source]()
-                {
-                    std::vector<CLI::SchemaField> schema;
-                    for (const auto& [type, name] : source.fields)
+            config.logical.emplace_back(
+                CLI::LogicalSource{
+                    .name = source.name,
+                    .schema = [&source]()
                     {
-                        schema.emplace_back(name, type);
-                    }
-                    return schema;
-                }()});
+                        std::vector<CLI::SchemaField> schema;
+                        for (const auto& [type, name] : source.fields)
+                        {
+                            schema.emplace_back(name, type);
+                        }
+                        return schema;
+                    }()});
 
-            config.physical.emplace_back(CLI::PhysicalSource{
-                .logical = source.name,
-                .parserConfig = {{"type", "CSV"}, {"tupleDelimiter", "\n"}, {"fieldDelimiter", ","}},
-                .sourceConfig = {{"type", "File"}, {"filePath", source.csvFilePath}, {"numberOfBuffersInSourceLocalBufferPool", "-1"}}});
+            config.physical.emplace_back(
+                CLI::PhysicalSource{
+                    .logical = source.name,
+                    .parserConfig = {{"type", "CSV"}, {"tupleDelimiter", "\n"}, {"fieldDelimiter", ","}},
+                    .sourceConfig
+                    = {{"type", "File"}, {"filePath", source.csvFilePath}, {"numberOfBuffersInSourceLocalBufferPool", "-1"}}});
             sourceNamesToFilepath[source.name] = source.csvFilePath;
         });
 
@@ -107,24 +110,26 @@ std::vector<LoadedQueryPlan> loadFromSLTFile(
         {
             static uint64_t sourceIndex = 0;
 
-            config.logical.emplace_back(CLI::LogicalSource{
-                .name = source.name,
-                .schema = [&source]()
-                {
-                    std::vector<CLI::SchemaField> schema;
-                    for (const auto& [type, name] : source.fields)
+            config.logical.emplace_back(
+                CLI::LogicalSource{
+                    .name = source.name,
+                    .schema = [&source]()
                     {
-                        schema.emplace_back(name, type);
-                    }
-                    return schema;
-                }()});
+                        std::vector<CLI::SchemaField> schema;
+                        for (const auto& [type, name] : source.fields)
+                        {
+                            schema.emplace_back(name, type);
+                        }
+                        return schema;
+                    }()});
 
             const auto sourceFile = Query::sourceFile(workingDir, testFileName, sourceIndex++);
             sourceNamesToFilepath[source.name] = sourceFile;
-            config.physical.emplace_back(CLI::PhysicalSource{
-                .logical = source.name,
-                .parserConfig = {{"type", "CSV"}, {"tupleDelimiter", "\n"}, {"fieldDelimiter", ","}},
-                .sourceConfig = {{"type", "File"}, {"filePath", sourceFile}, {"numberOfBuffersInSourceLocalBufferPool", "-1"}}});
+            config.physical.emplace_back(
+                CLI::PhysicalSource{
+                    .logical = source.name,
+                    .parserConfig = {{"type", "CSV"}, {"tupleDelimiter", "\n"}, {"fieldDelimiter", ","}},
+                    .sourceConfig = {{"type", "File"}, {"filePath", sourceFile}, {"numberOfBuffersInSourceLocalBufferPool", "-1"}}});
             {
                 std::ofstream testFile(sourceFile);
                 if (!testFile.is_open())
@@ -440,7 +445,57 @@ runQueriesAtRemoteWorker(const std::vector<Query>& queries, const uint64_t numCo
     return failedQueries.copy();
 }
 
-std::vector<RunningQuery> serializeExecutionResults(const std::vector<RunningQuery>& queries, nlohmann::json& resultJson)
+/// Serializes a logical operator to a json representation. Will serialize the children beforehand and not serialize it, if it was already visited
+void serializeOperatorToJson(LogicalPlan plan, LogicalOperator& op, std::vector<uint64_t>& foundOps, nlohmann::json& resultJson)
+{
+    if (const auto id = std::find(foundOps.begin(), foundOps.end(), op.getId().getRawValue()); id == foundOps.end())
+    {
+        /// If we have not visited this op before, we visit it now and create its entry in the resultJson
+        uint64_t opId = op.getId().getRawValue();
+        foundOps.emplace_back(opId);
+        std::string opType(op.getName());
+
+        /// Get all parent operator ids of this operator
+        std::vector<LogicalOperator> parents = getParents(plan, op);
+        std::vector<uint64_t> parentIds;
+        for (const auto& parent : parents)
+        {
+            parentIds.emplace_back(parent.getId().getRawValue());
+        }
+
+        std::vector<uint64_t> childrenIds;
+        for (auto child : op.getChildren())
+        {
+            /// Serialize children and get their ids
+            serializeOperatorToJson(plan, child, foundOps, resultJson);
+            childrenIds.emplace_back(child.getId().getRawValue());
+        }
+
+        std::string opLabel = op.explain(ExplainVerbosity::Short);
+
+        resultJson.push_back({
+            {"id", opId},
+            {"type", opType},
+            {"label", opLabel},
+            {"inputs", childrenIds},
+            {"outputs", parentIds},
+        });
+    }
+}
+
+/// Function to start off the json serialization of the logical query plan operators
+/// Takes each sink of the query and recursively adds the serializations of the sink and its children to the json
+void serializeQueryToJson(LogicalPlan plan, nlohmann::json& resultJson)
+{
+    std::vector<uint64_t> foundOps = std::vector<uint64_t>();
+    for (auto rootOp : plan.rootOperators)
+    {
+        serializeOperatorToJson(plan, rootOp, foundOps, resultJson);
+    }
+}
+
+std::vector<RunningQuery>
+serializeExecutionResults(const std::vector<RunningQuery>& queries, nlohmann::json& resultJson, bool visualizePlans)
 {
     std::vector<RunningQuery> failedQueries;
     for (const auto& queryRan : queries)
@@ -450,12 +505,30 @@ std::vector<RunningQuery> serializeExecutionResults(const std::vector<RunningQue
             failedQueries.emplace_back(queryRan);
         }
         const auto executionTimeInSeconds = queryRan.getElapsedTime().count();
-        resultJson.push_back({
-            {"query name", queryRan.query.resultFile().stem()},
-            {"time", executionTimeInSeconds},
-            {"bytesPerSecond", static_cast<double>(queryRan.bytesProcessed.value_or(NAN)) / executionTimeInSeconds},
-            {"tuplesPerSecond", static_cast<double>(queryRan.tuplesProcessed.value_or(NAN)) / executionTimeInSeconds},
-        });
+
+        // Serialize the logical plan
+        if (visualizePlans)
+        {
+            nlohmann::json logicalPlanJson;
+            serializeQueryToJson(queryRan.query.queryPlan, logicalPlanJson);
+            std::cout << logicalPlanJson << std::endl;
+            resultJson.push_back({
+                {"query name", queryRan.query.resultFile().stem()},
+                {"time", executionTimeInSeconds},
+                {"bytesPerSecond", static_cast<double>(queryRan.bytesProcessed.value_or(NAN)) / executionTimeInSeconds},
+                {"tuplesPerSecond", static_cast<double>(queryRan.tuplesProcessed.value_or(NAN)) / executionTimeInSeconds},
+                {"serializedLogicalPlan", logicalPlanJson},
+            });
+        }
+        else
+        {
+            resultJson.push_back({
+                {"query name", queryRan.query.resultFile().stem()},
+                {"time", executionTimeInSeconds},
+                {"bytesPerSecond", static_cast<double>(queryRan.bytesProcessed.value_or(NAN)) / executionTimeInSeconds},
+                {"tuplesPerSecond", static_cast<double>(queryRan.tuplesProcessed.value_or(NAN)) / executionTimeInSeconds},
+            });
+        }
     }
     return failedQueries;
 }
@@ -477,7 +550,10 @@ QuerySummary waitForQueryTermination(SingleNodeWorker& worker, QueryId queryId)
 }
 
 std::vector<RunningQuery> runQueriesAndBenchmark(
-    const std::vector<Query>& queries, const Configuration::SingleNodeWorkerConfiguration& configuration, nlohmann::json& resultJson)
+    const std::vector<Query>& queries,
+    const Configuration::SingleNodeWorkerConfiguration& configuration,
+    nlohmann::json& resultJson,
+    bool visualizePlans)
 {
     SingleNodeWorker worker(configuration);
     std::vector<RunningQuery> ranQueries;
@@ -526,7 +602,7 @@ std::vector<RunningQuery> runQueriesAndBenchmark(
         queryFinishedCounter += 1;
     }
 
-    return serializeExecutionResults(ranQueries, resultJson);
+    return serializeExecutionResults(ranQueries, resultJson, visualizePlans);
 }
 
 void printQueryResultToStdOut(

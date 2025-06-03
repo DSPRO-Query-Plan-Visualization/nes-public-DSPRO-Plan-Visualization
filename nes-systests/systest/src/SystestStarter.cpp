@@ -126,6 +126,10 @@ Configuration::SystestConfiguration readConfiguration(int argc, const char** arg
         std::cout << "Running systests in benchmarking mode. Only one query is run at a time!\n";
         config.numberConcurrentQueries = 1;
     }
+    else if (program.is_used("--visualizePlan"))
+    {
+        std::cout << "--visualizeQueries is set but -b is not. Set -b to enable benchmarking to add the plan json to result.json.\n";
+    }
 
     if (program.is_used("-d"))
     {
@@ -404,7 +408,7 @@ int main(int argc, const char** argv)
             if (config.benchmark)
             {
                 nlohmann::json benchmarkResults;
-                failedQueries = Systest::runQueriesAndBenchmark(queries, singleNodeWorkerConfiguration, benchmarkResults);
+                failedQueries = Systest::runQueriesAndBenchmark(queries, singleNodeWorkerConfiguration, benchmarkResults, config.visualizePlan);
                 std::cout << benchmarkResults.dump(4);
                 const auto outputPath = std::filesystem::path(config.workingDir.getValue()) / "BenchmarkResults.json";
                 std::ofstream outputFile(outputPath);
