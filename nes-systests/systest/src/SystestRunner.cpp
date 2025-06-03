@@ -214,7 +214,57 @@ runQueries(const std::vector<SystestQuery>& queries, const uint64_t numConcurren
 
 namespace
 {
-std::vector<RunningQuery> serializeExecutionResults(const std::vector<RunningQuery>& queries, nlohmann::json& resultJson)
+/// Serializes a logical operator to a json representation. Will serialize the children beforehand and not serialize it, if it was already visited
+void serializeOperatorToJson(LogicalPlan plan, LogicalOperator& op, std::vector<uint64_t>& foundOps, nlohmann::json& resultJson)
+{
+    if (const auto id = std::find(foundOps.begin(), foundOps.end(), op.getId().getRawValue()); id == foundOps.end())
+    {
+        /// If we have not visited this op before, we visit it now and create its entry in the resultJson
+        uint64_t opId = op.getId().getRawValue();
+        foundOps.emplace_back(opId);
+        std::string opType(op.getName());
+
+        /// Get all parent operator ids of this operator
+        std::vector<LogicalOperator> parents = getParents(plan, op);
+        std::vector<uint64_t> parentIds;
+        for (const auto& parent : parents)
+        {
+            parentIds.emplace_back(parent.getId().getRawValue());
+        }
+
+        std::vector<uint64_t> childrenIds;
+        for (auto child : op.getChildren())
+        {
+            /// Serialize children and get their ids
+            serializeOperatorToJson(plan, child, foundOps, resultJson);
+            childrenIds.emplace_back(child.getId().getRawValue());
+        }
+
+        std::string opLabel = op.explain(ExplainVerbosity::Short);
+
+        resultJson.push_back({
+            {"id", opId},
+            {"type", opType},
+            {"label", opLabel},
+            {"inputs", childrenIds},
+            {"outputs", parentIds},
+        });
+    }
+}
+
+/// Function to start off the json serialization of the logical query plan operators
+/// Takes each sink of the query and recursively adds the serializations of the sink and its children to the json
+void serializeQueryToJson(LogicalPlan plan, nlohmann::json& resultJson)
+{
+    std::vector<uint64_t> foundOps = std::vector<uint64_t>();
+    for (auto rootOp : plan.getRootOperators)
+    {
+        serializeOperatorToJson(plan, rootOp, foundOps, resultJson);
+    }
+}
+
+std::vector<RunningQuery>
+serializeExecutionResults(const std::vector<RunningQuery>& queries, nlohmann::json& resultJson, bool visualizePlans)
 {
     std::vector<RunningQuery> failedQueries;
     for (const auto& queryRan : queries)
@@ -224,19 +274,40 @@ std::vector<RunningQuery> serializeExecutionResults(const std::vector<RunningQue
             failedQueries.emplace_back(queryRan);
         }
         const auto executionTimeInSeconds = queryRan.getElapsedTime().count();
-        resultJson.push_back({
-            {"query name", queryRan.systestQuery.testName},
-            {"time", executionTimeInSeconds},
-            {"bytesPerSecond", static_cast<double>(queryRan.bytesProcessed.value_or(NAN)) / executionTimeInSeconds},
-            {"tuplesPerSecond", static_cast<double>(queryRan.tuplesProcessed.value_or(NAN)) / executionTimeInSeconds},
-        });
+        std::expected<SystestQuery::PlanInfo, Exception> planInfo = queryRan.systestQuery.planInfoOrException;
+        if (visualizePlans && planInfo)
+        {
+            const auto logicalPlan = planInfo.value().queryPlan;
+            nlohmann::json logicalPlanJson;
+            serializeQueryToJson(logicalPlan, logicalPlanJson);
+            std::cout << logicalPlanJson << std::endl;
+            resultJson.push_back({
+                {"query name", queryRan.systestQuery.testName},
+                {"time", executionTimeInSeconds},
+                {"bytesPerSecond", static_cast<double>(queryRan.bytesProcessed.value_or(NAN)) / executionTimeInSeconds},
+                {"tuplesPerSecond", static_cast<double>(queryRan.tuplesProcessed.value_or(NAN)) / executionTimeInSeconds},
+                {"serializedLogicalPlan", logicalPlanJson},
+            });
+        }
+        else
+        {
+            resultJson.push_back({
+                {"query name", queryRan.systestQuery.testName},
+                {"time", executionTimeInSeconds},
+                {"bytesPerSecond", static_cast<double>(queryRan.bytesProcessed.value_or(NAN)) / executionTimeInSeconds},
+                {"tuplesPerSecond", static_cast<double>(queryRan.tuplesProcessed.value_or(NAN)) / executionTimeInSeconds},
+            });
+        }
     }
     return failedQueries;
 }
 }
 
 std::vector<RunningQuery> runQueriesAndBenchmark(
-    const std::vector<SystestQuery>& queries, const SingleNodeWorkerConfiguration& configuration, nlohmann::json& resultJson)
+    const std::vector<SystestQuery>& queries,
+    const SingleNodeWorkerConfiguration& configuration,
+    nlohmann::json& resultJson,
+    bool visualizePlans)
 {
     auto worker = std::make_unique<EmbeddedWorkerQueryManager>(configuration);
     QuerySubmitter submitter(std::move(worker));
@@ -307,7 +378,9 @@ std::vector<RunningQuery> runQueriesAndBenchmark(
     }
 
     return serializeExecutionResults(
-        ranQueries | std::views::transform([](const auto& query) { return *query; }) | std::ranges::to<std::vector>(), resultJson);
+        ranQueries | std::views::transform([](const auto& query) { return *query; }) | std::ranges::to<std::vector>(),
+        resultJson,
+        visualizePlans);
 }
 
 void printQueryResultToStdOut(

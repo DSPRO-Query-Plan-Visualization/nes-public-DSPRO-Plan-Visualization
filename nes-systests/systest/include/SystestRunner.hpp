@@ -62,9 +62,11 @@ runQueries(const std::vector<SystestQuery>& queries, uint64_t numConcurrentQueri
 runQueriesAtRemoteWorker(const std::vector<SystestQuery>& queries, uint64_t numConcurrentQueries, const std::string& serverURI);
 
 /// Run queries sequentially locally and benchmark the run time of each query.
+/// If visualizePlans is set, json representations of the logical and pipeline plan will be created and added to the benchmark result json.
+/// This way, the Conbench server can create a graphical representation of the query plan.
 /// @return vector containing failed queries
 [[nodiscard]] std::vector<RunningQuery> runQueriesAndBenchmark(
-    const std::vector<SystestQuery>& queries, const SingleNodeWorkerConfiguration& configuration, nlohmann::json& resultJson);
+    const std::vector<SystestQuery>& queries, const SingleNodeWorkerConfiguration& configuration, nlohmann::json& resultJson, bool visualizePlans);
 
 /// Prints the error message, if the query has failed/passed and the expected and result tuples, like below
 /// function/arithmetical/FunctionDiv:4..................................Passed
