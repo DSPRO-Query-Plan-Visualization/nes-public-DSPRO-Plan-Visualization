@@ -46,22 +46,42 @@ class SystestAdapter(BenchmarkAdapter):
         benchmarkResults = []
 
         for result in raw_results:
-            benchmarkResults.append(BenchmarkResult(
-                stats={
-                    "data": [result["time"]],
-                    "unit": "ns"
-                },
-                context={"benchmark_language": "systest"},
-                tags={"name": result["query name"]},
-            ))
-            benchmarkResults.append(BenchmarkResult(
-                stats={
-                    "data": [result["bytesPerSecond"]],
-                    "unit": "B/s"
-                },
-                context={"benchmark_language": "systest"},
-                tags={"name": result["query name"] + " [B/s]"},
-            ))
+            if "serializedLogicalPlan" in result:
+                benchmarkResults.append(BenchmarkResult(
+                    stats={
+                        "data": [result["time"]],
+                        "unit": "ns",
+                        "logicalPlanJson": [result["serializedLogicalPlan"]]
+                    },
+                    context={"benchmark_language": "systest"},
+                    tags={"name": result["query name"]},
+                ))
+                benchmarkResults.append(BenchmarkResult(
+                    stats={
+                        "data": [result["bytesPerSecond"]],
+                        "unit": "B/s",
+                        "logicalPlanJson": [result["serializedLogicalPlan"]]
+                    },
+                    context={"benchmark_language": "systest"},
+                    tags={"name": result["query name"] + " [B/s]"},
+                ))
+            else:
+                benchmarkResults.append(BenchmarkResult(
+                    stats={
+                        "data": [result["time"]],
+                        "unit": "ns",
+                    },
+                    context={"benchmark_language": "systest"},
+                    tags={"name": result["query name"]},
+                ))
+                benchmarkResults.append(BenchmarkResult(
+                    stats={
+                        "data": [result["bytesPerSecond"]],
+                        "unit": "B/s",
+                    },
+                    context={"benchmark_language": "systest"},
+                    tags={"name": result["query name"] + " [B/s]"},
+                ))
 
         return benchmarkResults
 
