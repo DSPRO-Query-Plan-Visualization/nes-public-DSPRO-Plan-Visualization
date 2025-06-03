@@ -54,6 +54,7 @@ public:
     SequenceOption<StringOption> excludeGroups = {"excludeGroups", "test groups to exclude"};
     StringOption workerConfig = {"workerConfig", "", "used worker config file (.yaml)"};
     StringOption queryCompilerConfig = {"queryCompilerConfig", "", "used query compiler config file (.yaml)"};
+    BoolOption visualizePlan = {"Visualize Plan", "false", "Visualizes the logical plan on the Conbench server."};
     StringOption grpcAddressUri
         = {"grpc",
            "",

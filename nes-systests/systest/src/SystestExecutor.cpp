@@ -123,6 +123,13 @@ SystestConfiguration readConfiguration(int argc, const char** argv)
         .default_value(false)
         .implicit_value(true);
 
+    program.add_argument("--visualizePlan")
+        .help(
+            "Sends serialized representation of the logical plan to the Conbench server, which will display it as a graph. Needs the -b "
+            "flag set to work.")
+        .default_value(false)
+        .implicit_value(true);
+
     try
     {
         program.parse_args(argc, argv);
@@ -150,6 +157,11 @@ SystestConfiguration readConfiguration(int argc, const char** argv)
             NES_ERROR("Cannot run systest in Benchmarking mode with concurrency enabled!");
             std::cout << "Cannot run systest in benchmarking mode with concurrency enabled!\n";
             exit(-1); ///NOLINT(concurrency-mt-unsafe)
+        }
+        if (program.is_used("--visualizePlan"))
+        {
+            config.visualizePlan = true;
+            std::cout << "Query plan will be visualized on the conbench server.\n";
         }
         std::cout << "Running systests in benchmarking mode. Only one query is run at a time!\n";
         config.numberConcurrentQueries = 1;
