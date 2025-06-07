@@ -1,6 +1,6 @@
 [
     {
-        "bytesPerSecond": 10917889.694768498,
+        "bytesPerSecond": 10761900.494110182,
         "query name": "ClusterMonitoring_0",
         "serializedLogicalPlan": [
             {
@@ -39,7 +39,7 @@
                 "inputs": [
                     3
                 ],
-                "label": "WINDOW AGG(Sum)",
+                "label": "SlidingWindow AGG(monitoringClusterData$totalCpu = Sum(monitoringClusterData$cpu))",
                 "outputs": [
                     5
                 ],
@@ -55,11 +55,11 @@
                 "type": "Sink"
             }
         ],
-        "time": 139.931985,
-        "tuplesPerSecond": 133272.29653749283
+        "time": 141.96024,
+        "tuplesPerSecond": 131368.17041165894
     },
     {
-        "bytesPerSecond": 10745834.613592887,
+        "bytesPerSecond": 9586089.816706013,
         "query name": "ClusterMonitoring_1",
         "serializedLogicalPlan": [
             {
@@ -98,7 +98,7 @@
                 "inputs": [
                     9
                 ],
-                "label": "WINDOW AGG(Sum)",
+                "label": "SlidingWindow AGG(monitoringLightsaber$totalCpu = Sum(monitoringLightsaber$cpu))",
                 "outputs": [
                     11
                 ],
@@ -114,7 +114,7 @@
                 "type": "Sink"
             }
         ],
-        "time": 0.100891,
-        "tuplesPerSecond": 161481.20248585107
+        "time": 0.113097,
+        "tuplesPerSecond": 144053.33474804813
     }
 ]

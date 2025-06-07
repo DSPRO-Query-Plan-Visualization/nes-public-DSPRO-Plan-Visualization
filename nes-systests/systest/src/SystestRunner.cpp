@@ -511,7 +511,6 @@ serializeExecutionResults(const std::vector<RunningQuery>& queries, nlohmann::js
         {
             nlohmann::json logicalPlanJson;
             serializeQueryToJson(queryRan.query.queryPlan, logicalPlanJson);
-            std::cout << logicalPlanJson << std::endl;
             resultJson.push_back({
                 {"query name", queryRan.query.resultFile().stem()},
                 {"time", executionTimeInSeconds},

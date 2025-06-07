@@ -39,6 +39,11 @@ TimeMeasure TumblingWindow::getSlide()
     return getSize();
 }
 
+std::string_view TumblingWindow::getName()
+{
+    return NAME;
+}
+
 std::string TumblingWindow::toString() const
 {
     return fmt::format("TumblingWindow: size={} timeCharacteristic={}", size.getTime(), timeCharacteristic);

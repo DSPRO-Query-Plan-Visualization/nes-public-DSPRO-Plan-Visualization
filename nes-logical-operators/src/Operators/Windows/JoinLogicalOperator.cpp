@@ -80,7 +80,7 @@ std::string JoinLogicalOperator::explain(ExplainVerbosity verbosity) const
             windowMetaData.windowStartFieldName,
             windowMetaData.windowEndFieldName);
     }
-    return fmt::format("Join({})", getJoinFunction().explain(verbosity));
+    return fmt::format("{}({})", getJoinTypeString(), getJoinFunction().explain(verbosity));
 }
 
 LogicalOperator JoinLogicalOperator::withInferredSchema(std::vector<Schema> inputSchemas) const
@@ -148,6 +148,11 @@ std::vector<std::vector<OriginId>> JoinLogicalOperator::getInputOriginIds() cons
 std::vector<OriginId> JoinLogicalOperator::getOutputOriginIds() const
 {
     return outputOriginIds;
+}
+
+std::string JoinLogicalOperator::getJoinTypeString() const
+{
+    return  std::string(magic_enum::enum_name(joinType));
 }
 
 LogicalOperator JoinLogicalOperator::withInputOriginIds(std::vector<std::vector<OriginId>> ids) const
