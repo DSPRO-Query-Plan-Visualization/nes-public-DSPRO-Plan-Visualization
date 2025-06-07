@@ -31,6 +31,7 @@ public:
     TimeMeasure getSize() override;
     TimeMeasure getSlide() override;
 
+    std::string_view getName() override;
     std::string toString() const override;
 
     bool operator==(const WindowType& otherWindowType) const override;
@@ -39,6 +40,7 @@ private:
     SlidingWindow(TimeCharacteristic timeCharacteristic, TimeMeasure size, TimeMeasure slide);
     const TimeMeasure size;
     const TimeMeasure slide;
+    static constexpr std::string_view NAME = "SlidingWindow";
 };
 
 }

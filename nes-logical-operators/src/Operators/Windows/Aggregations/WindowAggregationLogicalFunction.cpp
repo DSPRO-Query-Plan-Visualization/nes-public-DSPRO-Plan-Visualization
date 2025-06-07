@@ -49,6 +49,11 @@ std::string WindowAggregationLogicalFunction::toString() const
     return fmt::format("WindowAggregation: onField={} asField={}", onField, asField);
 }
 
+std::string WindowAggregationLogicalFunction::simpleToString() const
+{
+    return fmt::format("{} = {}({})", asField.explain(ExplainVerbosity::Short), getName(), onField.explain(ExplainVerbosity::Short));
+}
+
 DataType WindowAggregationLogicalFunction::getInputStamp() const
 {
     return inputStamp;

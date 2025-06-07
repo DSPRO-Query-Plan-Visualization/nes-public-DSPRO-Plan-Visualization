@@ -275,6 +275,8 @@ serializeExecutionResults(const std::vector<RunningQuery>& queries, nlohmann::js
         }
         const auto executionTimeInSeconds = queryRan.getElapsedTime().count();
         std::expected<SystestQuery::PlanInfo, Exception> planInfo = queryRan.systestQuery.planInfoOrException;
+        /// If we cannot access the logical plan of the query, we cannot serialize it to json.
+        /// Therefore, we then skip the serialization part.
         if (visualizePlans && planInfo)
         {
             const auto logicalPlan = planInfo.value().queryPlan;

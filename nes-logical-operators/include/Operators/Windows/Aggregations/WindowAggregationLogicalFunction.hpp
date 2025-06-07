@@ -42,6 +42,7 @@ public:
 
     [[nodiscard]] virtual SerializableAggregationFunction serialize() const = 0;
 
+    [[nodiscard]]std::string simpleToString() const;
     [[nodiscard]] virtual std::string_view getName() const noexcept = 0;
 
     DataType inputStamp, partialAggregateStamp, finalAggregateStamp;

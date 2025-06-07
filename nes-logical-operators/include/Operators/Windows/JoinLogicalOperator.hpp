@@ -56,6 +56,7 @@ public:
     [[nodiscard]] std::string getWindowStartFieldName() const;
     [[nodiscard]] std::string getWindowEndFieldName() const;
     [[nodiscard]] const WindowMetaData& getWindowMetaData() const;
+    [[nodiscard]] std::string getJoinTypeString() const;
 
 
     [[nodiscard]] bool operator==(const LogicalOperatorConcept& rhs) const override;
