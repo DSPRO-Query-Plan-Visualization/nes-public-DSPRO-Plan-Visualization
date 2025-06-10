@@ -1,0 +1,120 @@
+[
+    {
+        "bytesPerSecond": 10761900.494110182,
+        "query name": "ClusterMonitoring_0",
+        "serializedLogicalPlan": [
+            {
+                "id": 6,
+                "inputs": [],
+                "label": "SOURCE(monitoringClusterData)",
+                "outputs": [
+                    2
+                ],
+                "type": "Source"
+            },
+            {
+                "id": 2,
+                "inputs": [
+                    6
+                ],
+                "label": "SELECTION(monitoringClusterData$eventType = 3)",
+                "outputs": [
+                    3
+                ],
+                "type": "Selection"
+            },
+            {
+                "id": 3,
+                "inputs": [
+                    2
+                ],
+                "label": "WATERMARK_ASSIGNER(Event time)",
+                "outputs": [
+                    4
+                ],
+                "type": "EventTimeWatermarkAssigner"
+            },
+            {
+                "id": 4,
+                "inputs": [
+                    3
+                ],
+                "label": "SlidingWindow AGG(monitoringClusterData$totalCpu = Sum(monitoringClusterData$cpu))",
+                "outputs": [
+                    5
+                ],
+                "type": "WindowedAggregation"
+            },
+            {
+                "id": 5,
+                "inputs": [
+                    4
+                ],
+                "label": "SINK(CHECKSUM0)",
+                "outputs": [],
+                "type": "Sink"
+            }
+        ],
+        "time": 141.96024,
+        "tuplesPerSecond": 131368.17041165894
+    },
+    {
+        "bytesPerSecond": 9586089.816706013,
+        "query name": "ClusterMonitoring_1",
+        "serializedLogicalPlan": [
+            {
+                "id": 12,
+                "inputs": [],
+                "label": "SOURCE(monitoringLightsaber)",
+                "outputs": [
+                    8
+                ],
+                "type": "Source"
+            },
+            {
+                "id": 8,
+                "inputs": [
+                    12
+                ],
+                "label": "SELECTION(monitoringLightsaber$eventType = 3)",
+                "outputs": [
+                    9
+                ],
+                "type": "Selection"
+            },
+            {
+                "id": 9,
+                "inputs": [
+                    8
+                ],
+                "label": "WATERMARK_ASSIGNER(Event time)",
+                "outputs": [
+                    10
+                ],
+                "type": "EventTimeWatermarkAssigner"
+            },
+            {
+                "id": 10,
+                "inputs": [
+                    9
+                ],
+                "label": "SlidingWindow AGG(monitoringLightsaber$totalCpu = Sum(monitoringLightsaber$cpu))",
+                "outputs": [
+                    11
+                ],
+                "type": "WindowedAggregation"
+            },
+            {
+                "id": 11,
+                "inputs": [
+                    10
+                ],
+                "label": "SINK(CHECKSUM1)",
+                "outputs": [],
+                "type": "Sink"
+            }
+        ],
+        "time": 0.113097,
+        "tuplesPerSecond": 144053.33474804813
+    }
+]

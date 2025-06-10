@@ -40,6 +40,11 @@ TimeMeasure SlidingWindow::getSize()
     return size;
 }
 
+std::string_view SlidingWindow::getName()
+{
+    return NAME;
+}
+
 TimeMeasure SlidingWindow::getSlide()
 {
     return slide;

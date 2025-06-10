@@ -27,6 +27,8 @@ public:
 
     virtual ~WindowType() = default;
 
+    /// Returns the name of the window, e.g. "SlidingWindow"
+    virtual std::string_view getName() = 0;
     virtual std::string toString() const = 0;
 
     virtual bool operator==(const WindowType& otherWindowType) const = 0;

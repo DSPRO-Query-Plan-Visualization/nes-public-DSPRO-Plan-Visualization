@@ -75,7 +75,7 @@ std::string WindowedAggregationLogicalOperator::explain(ExplainVerbosity verbosi
     }
     auto windowAggregation = getWindowAggregation();
     return fmt::format(
-        "WINDOW AGG({})", fmt::join(std::views::transform(windowAggregation, [](const auto& agg) { return agg->getName(); }), ", "));
+        "{} AGG({})", windowType->getName(), fmt::join(std::views::transform(windowAggregation, [](const auto& agg) { return agg->simpleToString(); }), ", "));
 }
 
 bool WindowedAggregationLogicalOperator::operator==(const LogicalOperatorConcept& rhs) const
