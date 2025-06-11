@@ -244,7 +244,7 @@ void serializeOperatorToJson(LogicalPlan plan, LogicalOperator& op, std::vector<
 
         resultJson.push_back({
             {"id", opId},
-            {"type", opType},
+            {"node_type", opType},
             {"label", opLabel},
             {"inputs", childrenIds},
             {"outputs", parentIds},
