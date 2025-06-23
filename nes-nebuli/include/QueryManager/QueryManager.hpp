@@ -22,6 +22,7 @@
 #include <Identifiers/Identifiers.hpp>
 #include <Listeners/QueryLog.hpp>
 #include <Util/Pointers.hpp>
+#include <nlohmann/json.hpp>
 #include <ErrorHandling.hpp>
 
 namespace NES
@@ -36,7 +37,8 @@ class QueryManager
 {
 public:
     virtual ~QueryManager() = default;
-    [[nodiscard]] virtual std::expected<QueryId, Exception> registerQuery(const LogicalPlan& plan) = 0;
+    [[nodiscard]] virtual std::expected<QueryId, Exception>
+    registerQuery(const LogicalPlan& plan, nlohmann::json* pipelinePlanSerialization) = 0;
     virtual std::expected<void, Exception> start(QueryId queryId) noexcept = 0;
     virtual std::expected<void, Exception> stop(QueryId queryId) noexcept = 0;
     virtual std::expected<void, Exception> unregister(QueryId queryId) noexcept = 0;

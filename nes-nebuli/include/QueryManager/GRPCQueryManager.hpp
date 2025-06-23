@@ -22,6 +22,7 @@
 #include <Listeners/QueryLog.hpp>
 #include <Plans/LogicalPlan.hpp>
 #include <grpcpp/client_context.h>
+#include <nlohmann/json.hpp>
 #include <ErrorHandling.hpp>
 #include <SingleNodeWorkerRPCService.grpc.pb.h>
 
@@ -33,7 +34,7 @@ class GRPCQueryManager final : public QueryManager
 
 public:
     explicit GRPCQueryManager(const std::shared_ptr<grpc::Channel>& channel);
-    std::expected<QueryId, Exception> registerQuery(const LogicalPlan& plan) noexcept override;
+    std::expected<QueryId, Exception> registerQuery(const LogicalPlan& plan, nlohmann::json*) noexcept override;
     std::expected<void, Exception> stop(QueryId queryId) noexcept override;
     std::expected<void, Exception> start(QueryId queryId) noexcept override;
     std::expected<void, Exception> unregister(QueryId queryId) noexcept override;

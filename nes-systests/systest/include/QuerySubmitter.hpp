@@ -37,12 +37,11 @@ class QuerySubmitter
 {
 public:
     explicit QuerySubmitter(std::unique_ptr<QueryManager> queryManager);
-    std::expected<QueryId, Exception> registerQuery(const LogicalPlan& plan);
+    std::expected<QueryId, Exception> registerQuery(const LogicalPlan& plan, nlohmann::json* pipelinePlanSerialization);
     void startQuery(QueryId query);
     void stopQuery(QueryId query);
     void unregisterQuery(QueryId query);
     QuerySummary waitForQueryTermination(QueryId query);
-
     /// Blocks until atleast one query has finished (or potentially failed)
     std::vector<QuerySummary> finishedQueries();
 

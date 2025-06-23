@@ -15,6 +15,7 @@
 
 #include <memory>
 #include <Util/DumpMode.hpp>
+#include <nlohmann/json.hpp>
 #include <CompiledQueryPlan.hpp>
 #include <PhysicalPlan.hpp>
 
@@ -37,7 +38,7 @@ class QueryCompiler
 {
 public:
     QueryCompiler();
-    std::unique_ptr<CompiledQueryPlan> compileQuery(std::unique_ptr<QueryCompilationRequest> request);
+    std::unique_ptr<CompiledQueryPlan> compileQuery(std::unique_ptr<QueryCompilationRequest> request, nlohmann::json* pipelinePlanJson);
 };
 
 }

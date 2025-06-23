@@ -29,13 +29,17 @@ namespace NES::QueryCompilation
 QueryCompiler::QueryCompiler() = default;
 
 /// This phase should be as dumb as possible and not further decisions should be made here.
-std::unique_ptr<CompiledQueryPlan> QueryCompiler::compileQuery(std::unique_ptr<QueryCompilationRequest> request)
+std::unique_ptr<CompiledQueryPlan> QueryCompiler::compileQuery(std::unique_ptr<QueryCompilationRequest> request, nlohmann::json* pipelinePlanJson)
 {
     try
     {
         auto lowerToCompiledQueryPlanPhase = LowerToCompiledQueryPlanPhase(request->dumpCompilationResult);
 
         auto pipelinedQueryPlan = PipeliningPhase::apply(request->queryPlan);
+        if (pipelinePlanJson)
+        {
+            pipelinedQueryPlan->serializeAsJson(pipelinePlanJson);
+        }
         return lowerToCompiledQueryPlanPhase.apply(pipelinedQueryPlan);
     }
     catch (...)

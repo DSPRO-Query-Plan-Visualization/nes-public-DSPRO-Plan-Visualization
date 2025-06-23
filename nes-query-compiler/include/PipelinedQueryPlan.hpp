@@ -19,6 +19,7 @@
 #include <Identifiers/Identifiers.hpp>
 #include <Util/ExecutionMode.hpp>
 #include <Util/Logger/Formatter.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <Pipeline.hpp>
 
 namespace NES
@@ -45,6 +46,7 @@ struct PipelinedQueryPlan final
     [[nodiscard]] const std::vector<std::shared_ptr<Pipeline>>& getPipelines() const;
     void addPipeline(const std::shared_ptr<Pipeline>& pipeline);
     void removePipeline(Pipeline& pipeline);
+    void serializeAsJson(nlohmann::json* json) const;
 
 private:
     QueryId queryId;

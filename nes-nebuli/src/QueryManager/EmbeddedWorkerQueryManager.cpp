@@ -27,9 +27,9 @@ EmbeddedWorkerQueryManager::EmbeddedWorkerQueryManager(const SingleNodeWorkerCon
 {
 }
 
-std::expected<QueryId, Exception> EmbeddedWorkerQueryManager::registerQuery(const LogicalPlan& plan) noexcept
+std::expected<QueryId, Exception> EmbeddedWorkerQueryManager::registerQuery(const LogicalPlan& plan, nlohmann::json*) noexcept
 {
-    return worker.registerQuery(plan);
+    return worker.registerQuery(plan, nullptr);
 }
 
 std::expected<void, Exception> EmbeddedWorkerQueryManager::start(const QueryId queryId) noexcept

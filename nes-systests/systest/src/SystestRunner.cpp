@@ -141,7 +141,7 @@ runQueries(const std::vector<SystestQuery>& queries, const uint64_t numConcurren
             if (nextQuery.planInfoOrException.has_value())
             {
                 /// Registration
-                if (auto reg = querySubmitter.registerQuery(nextQuery.planInfoOrException.value().queryPlan))
+                if (auto reg = querySubmitter.registerQuery(nextQuery.planInfoOrException.value().queryPlan, nullptr))
                 {
                     hasOneMoreQueryToStart = true;
                     querySubmitter.startQuery(*reg);
@@ -217,7 +217,7 @@ namespace
 /// Serializes a logical operator to a json representation. Will serialize the children beforehand and not serialize it, if it was already visited
 void serializeOperatorToJson(LogicalPlan plan, LogicalOperator& op, std::vector<uint64_t>& foundOps, nlohmann::json& resultJson)
 {
-    if (const auto id = std::find(foundOps.begin(), foundOps.end(), op.getId().getRawValue()); id == foundOps.end())
+    if (const auto id = std::ranges::find(foundOps, op.getId().getRawValue()); id == foundOps.end())
     {
         /// If we have not visited this op before, we visit it now and create its entry in the resultJson
         uint64_t opId = op.getId().getRawValue();
@@ -257,17 +257,20 @@ void serializeOperatorToJson(LogicalPlan plan, LogicalOperator& op, std::vector<
 void serializeQueryToJson(LogicalPlan plan, nlohmann::json& resultJson)
 {
     std::vector<uint64_t> foundOps = std::vector<uint64_t>();
-    for (auto rootOp : plan.getRootOperators)
+    for (auto rootOp : plan.getRootOperators())
     {
         serializeOperatorToJson(plan, rootOp, foundOps, resultJson);
     }
 }
 
-std::vector<RunningQuery>
-serializeExecutionResults(const std::vector<RunningQuery>& queries, nlohmann::json& resultJson, bool visualizePlans)
+/// Serializes the query results in the resultJson object
+/// Captures runtime and bytes per ms
+/// Optionally captures json serializations of logical and pipeline query plan to visualize on the Conbench server
+std::vector<RunningQuery> serializeExecutionResults(
+    const std::vector<RunningQuery>& queries, nlohmann::json& resultJson, std::vector<nlohmann::json>& pipelinePlanJson)
 {
     std::vector<RunningQuery> failedQueries;
-    for (const auto& queryRan : queries)
+    for (const auto& [i, queryRan] : views::enumerate(queries))
     {
         if (!queryRan.passed)
         {
@@ -277,19 +280,18 @@ serializeExecutionResults(const std::vector<RunningQuery>& queries, nlohmann::js
         std::expected<SystestQuery::PlanInfo, Exception> planInfo = queryRan.systestQuery.planInfoOrException;
         /// If we cannot access the logical plan of the query, we cannot serialize it to json.
         /// Therefore, we then skip the serialization part.
-        if (visualizePlans && planInfo)
+        if (!pipelinePlanJson.empty() && planInfo)
         {
             const auto logicalPlan = planInfo.value().queryPlan;
             nlohmann::json logicalPlanJson;
             serializeQueryToJson(logicalPlan, logicalPlanJson);
-            std::cout << logicalPlanJson << std::endl;
-            resultJson.push_back({
-                {"query name", queryRan.systestQuery.testName},
-                {"time", executionTimeInSeconds},
-                {"bytesPerSecond", static_cast<double>(queryRan.bytesProcessed.value_or(NAN)) / executionTimeInSeconds},
-                {"tuplesPerSecond", static_cast<double>(queryRan.tuplesProcessed.value_or(NAN)) / executionTimeInSeconds},
-                {"serializedLogicalPlan", logicalPlanJson},
-            });
+            resultJson.push_back(
+                {{"query name", queryRan.systestQuery.testName},
+                 {"time", executionTimeInSeconds},
+                 {"bytesPerSecond", static_cast<double>(queryRan.bytesProcessed.value_or(NAN)) / executionTimeInSeconds},
+                 {"tuplesPerSecond", static_cast<double>(queryRan.tuplesProcessed.value_or(NAN)) / executionTimeInSeconds},
+                 {"serializedLogicalPlan", logicalPlanJson},
+                 {"serializedPipelinePlan", pipelinePlanJson[i]}});
         }
         else
         {
@@ -314,6 +316,9 @@ std::vector<RunningQuery> runQueriesAndBenchmark(
     auto worker = std::make_unique<EmbeddedWorkerQueryManager>(configuration);
     QuerySubmitter submitter(std::move(worker));
     std::vector<std::shared_ptr<RunningQuery>> ranQueries;
+    /// We create a vector with pipeline plan serializations.
+    /// The vector will remain empty if visualizePlans is not set.
+    std::vector<nlohmann::json> pipelinePlanSerializations;
     std::size_t queryFinishedCounter = 0;
     const auto totalQueries = queries.size();
     for (const auto& queryToRun : queries)
@@ -324,12 +329,26 @@ std::vector<RunningQuery> runQueriesAndBenchmark(
             continue;
         }
 
-        const auto registrationResult = submitter.registerQuery(queryToRun.planInfoOrException.value().queryPlan);
+        auto pipelinePlanJson = nlohmann::json();
+        /// Pass the pipelineJson as raw pointer into the function, if we want to visualise our queries
+        /// Otherwise pass nullptr
+        /// This is currently a hotfix for not being able to set std::optional<class&> as arguments
+        const auto registrationResult = visualizePlans
+            ? submitter.registerQuery(queryToRun.planInfoOrException.value().queryPlan, &pipelinePlanJson)
+            : submitter.registerQuery(queryToRun.planInfoOrException.value().queryPlan, nullptr);
+
         if (not registrationResult.has_value())
         {
             fmt::println("skip failing query: {}", queryToRun.testName);
             continue;
         }
+
+        /// Emplace potentially filled pipelinePlanJson in the vector of all the jsons
+        if (visualizePlans)
+        {
+            pipelinePlanSerializations.emplace_back(pipelinePlanJson);
+        }
+
         auto queryId = registrationResult.value();
 
         auto runningQueryPtr = std::make_shared<RunningQuery>(queryToRun, queryId);
@@ -382,7 +401,7 @@ std::vector<RunningQuery> runQueriesAndBenchmark(
     return serializeExecutionResults(
         ranQueries | std::views::transform([](const auto& query) { return *query; }) | std::ranges::to<std::vector>(),
         resultJson,
-        visualizePlans);
+        pipelinePlanSerializations);
 }
 
 void printQueryResultToStdOut(

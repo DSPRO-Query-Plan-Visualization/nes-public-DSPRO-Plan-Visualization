@@ -42,7 +42,8 @@ GRPCQueryManager::GRPCQueryManager(const std::shared_ptr<grpc::Channel>& channel
 {
 }
 
-std::expected<QueryId, Exception> GRPCQueryManager::registerQuery(const NES::LogicalPlan& plan) noexcept
+std::expected<QueryId, Exception>
+GRPCQueryManager::registerQuery(const NES::LogicalPlan& plan, nlohmann::json*) noexcept
 {
     try
     {
