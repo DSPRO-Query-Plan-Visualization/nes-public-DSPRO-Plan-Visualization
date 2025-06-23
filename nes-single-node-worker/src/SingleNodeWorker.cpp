@@ -51,7 +51,7 @@ SingleNodeWorker::SingleNodeWorker(const Configuration::SingleNodeWorkerConfigur
 /// We might want to move this to the engine.
 static std::atomic queryIdCounter = INITIAL<QueryId>.getRawValue();
 
-QueryId SingleNodeWorker::registerQuery(LogicalPlan plan)
+QueryId SingleNodeWorker::registerQuery(LogicalPlan plan, std::optional<nlohmann::json&> pipelinePlanSerialization)
 {
     try
     {

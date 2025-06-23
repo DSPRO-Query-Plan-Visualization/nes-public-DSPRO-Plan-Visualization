@@ -289,7 +289,7 @@ std::vector<RunningQuery> runQueriesAtLocalWorker(
                         finishedProducing = true;
                         return;
                     }
-                    const auto queryId = worker.registerQuery(query.queryPlan);
+                    const auto queryId = worker.registerQuery(query.queryPlan, std::nullopt);
                     if (queryId == INVALID_QUERY_ID)
                     {
                         throw QueryInvalid("Received an invalid query id from the worker");
@@ -494,11 +494,14 @@ void serializeQueryToJson(LogicalPlan plan, nlohmann::json& resultJson)
     }
 }
 
+/// Serializes the query results in the resultJson object
+/// Captures runtime and bytes per ms
+/// Optionally captures json serializations of logical and pipeline query plan to visualize on the Conbench server
 std::vector<RunningQuery>
-serializeExecutionResults(const std::vector<RunningQuery>& queries, nlohmann::json& resultJson, bool visualizePlans)
+serializeExecutionResults(const std::vector<RunningQuery>& queries, nlohmann::json& resultJson, std::vector<nlohmann::json>& pipelinePlanJson)
 {
     std::vector<RunningQuery> failedQueries;
-    for (const auto& queryRan : queries)
+    for (const auto& [i, queryRan] : views::enumerate(queries))
     {
         if (!queryRan.passed)
         {
@@ -506,8 +509,9 @@ serializeExecutionResults(const std::vector<RunningQuery>& queries, nlohmann::js
         }
         const auto executionTimeInSeconds = queryRan.getElapsedTime().count();
 
-        // Serialize the logical plan
-        if (visualizePlans)
+        /// Serialize the logical plan
+        /// We can tell that visualizing queries is activated, by checking if the pipelinePlanJson vector is filled
+        if (!pipelinePlanJson.empty())
         {
             nlohmann::json logicalPlanJson;
             serializeQueryToJson(queryRan.query.queryPlan, logicalPlanJson);
@@ -517,6 +521,7 @@ serializeExecutionResults(const std::vector<RunningQuery>& queries, nlohmann::js
                 {"bytesPerSecond", static_cast<double>(queryRan.bytesProcessed.value_or(NAN)) / executionTimeInSeconds},
                 {"tuplesPerSecond", static_cast<double>(queryRan.tuplesProcessed.value_or(NAN)) / executionTimeInSeconds},
                 {"serializedLogicalPlan", logicalPlanJson},
+                {"serializedPipelinePlan", pipelinePlanJson[i]}
             });
         }
         else
@@ -554,13 +559,26 @@ std::vector<RunningQuery> runQueriesAndBenchmark(
     nlohmann::json& resultJson,
     bool visualizePlans)
 {
+    /// We create a vector with pipeline plan serializations.
+    /// The vector will remain empty if visualizePlans is not set.
+    std::vector<nlohmann::json> pipelinePlanSerializations;
     SingleNodeWorker worker(configuration);
     std::vector<RunningQuery> ranQueries;
     std::size_t queryFinishedCounter = 0;
     const auto totalQueries = queries.size();
     for (const auto& queryToRun : queries)
     {
-        const auto queryId = worker.registerQuery(queryToRun.queryPlan);
+        /// Create a pipeline plan json if we want to visualize our plan, otherwise, create a nullopt
+        auto pipelinePlanJson = visualizePlans ? nlohmann::json() : std::nullopt;
+        /// Pass the pipelineJson as optional argument into the registerQuery method.
+        /// If it is not nullopt, the worker will serialize the pipeline plan in the reference of the json.
+        const auto queryId = worker.registerQuery(queryToRun.queryPlan, pipelinePlanJson);
+
+        /// Emplace potentially filled pipelinePlanJson in the vector of all the jsons
+        if (pipelinePlanJson)
+        {
+            pipelinePlanSerializations.emplace_back(pipelinePlanJson);
+        }
         RunningQuery currentRunningQuery(queryToRun, queryId);
         {
             /// Measuring the time it takes from registering the query till unregistering / completion
@@ -601,7 +619,7 @@ std::vector<RunningQuery> runQueriesAndBenchmark(
         queryFinishedCounter += 1;
     }
 
-    return serializeExecutionResults(ranQueries, resultJson, visualizePlans);
+    return serializeExecutionResults(ranQueries, resultJson, pipelinePlanSerializations);
 }
 
 void printQueryResultToStdOut(
