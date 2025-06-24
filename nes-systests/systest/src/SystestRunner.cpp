@@ -289,7 +289,7 @@ std::vector<RunningQuery> runQueriesAtLocalWorker(
                         finishedProducing = true;
                         return;
                     }
-                    const auto queryId = worker.registerQuery(query.queryPlan, std::nullopt);
+                    const auto queryId = worker.registerQuery(query.queryPlan, nullptr);
                     if (queryId == INVALID_QUERY_ID)
                     {
                         throw QueryInvalid("Received an invalid query id from the worker");
@@ -448,7 +448,7 @@ runQueriesAtRemoteWorker(const std::vector<Query>& queries, const uint64_t numCo
 /// Serializes a logical operator to a json representation. Will serialize the children beforehand and not serialize it, if it was already visited
 void serializeOperatorToJson(LogicalPlan plan, LogicalOperator& op, std::vector<uint64_t>& foundOps, nlohmann::json& resultJson)
 {
-    if (const auto id = std::find(foundOps.begin(), foundOps.end(), op.getId().getRawValue()); id == foundOps.end())
+    if (const auto id = std::ranges::find(foundOps, op.getId().getRawValue()); id == foundOps.end())
     {
         /// If we have not visited this op before, we visit it now and create its entry in the resultJson
         uint64_t opId = op.getId().getRawValue();
@@ -497,8 +497,8 @@ void serializeQueryToJson(LogicalPlan plan, nlohmann::json& resultJson)
 /// Serializes the query results in the resultJson object
 /// Captures runtime and bytes per ms
 /// Optionally captures json serializations of logical and pipeline query plan to visualize on the Conbench server
-std::vector<RunningQuery>
-serializeExecutionResults(const std::vector<RunningQuery>& queries, nlohmann::json& resultJson, std::vector<nlohmann::json>& pipelinePlanJson)
+std::vector<RunningQuery> serializeExecutionResults(
+    const std::vector<RunningQuery>& queries, nlohmann::json& resultJson, std::vector<nlohmann::json>& pipelinePlanJson)
 {
     std::vector<RunningQuery> failedQueries;
     for (const auto& [i, queryRan] : views::enumerate(queries))
@@ -515,14 +515,13 @@ serializeExecutionResults(const std::vector<RunningQuery>& queries, nlohmann::js
         {
             nlohmann::json logicalPlanJson;
             serializeQueryToJson(queryRan.query.queryPlan, logicalPlanJson);
-            resultJson.push_back({
-                {"query name", queryRan.query.resultFile().stem()},
-                {"time", executionTimeInSeconds},
-                {"bytesPerSecond", static_cast<double>(queryRan.bytesProcessed.value_or(NAN)) / executionTimeInSeconds},
-                {"tuplesPerSecond", static_cast<double>(queryRan.tuplesProcessed.value_or(NAN)) / executionTimeInSeconds},
-                {"serializedLogicalPlan", logicalPlanJson},
-                {"serializedPipelinePlan", pipelinePlanJson[i]}
-            });
+            resultJson.push_back(
+                {{"query name", queryRan.query.resultFile().stem()},
+                 {"time", executionTimeInSeconds},
+                 {"bytesPerSecond", static_cast<double>(queryRan.bytesProcessed.value_or(NAN)) / executionTimeInSeconds},
+                 {"tuplesPerSecond", static_cast<double>(queryRan.tuplesProcessed.value_or(NAN)) / executionTimeInSeconds},
+                 {"serializedLogicalPlan", logicalPlanJson},
+                 {"serializedPipelinePlan", pipelinePlanJson[i]}});
         }
         else
         {
@@ -568,14 +567,16 @@ std::vector<RunningQuery> runQueriesAndBenchmark(
     const auto totalQueries = queries.size();
     for (const auto& queryToRun : queries)
     {
-        /// Create a pipeline plan json if we want to visualize our plan, otherwise, create a nullopt
-        auto pipelinePlanJson = visualizePlans ? nlohmann::json() : std::nullopt;
-        /// Pass the pipelineJson as optional argument into the registerQuery method.
-        /// If it is not nullopt, the worker will serialize the pipeline plan in the reference of the json.
-        const auto queryId = worker.registerQuery(queryToRun.queryPlan, pipelinePlanJson);
+        auto pipelinePlanJson = nlohmann::json();
+
+        /// Pass the pipelineJson as raw pointer into the function, if we want to visualise our queries
+        /// Otherwise pass nullptr
+        /// This is currently a hotfix for not being able to set std::optional<class&> as arguments
+        const auto queryId = visualizePlans ? worker.registerQuery(queryToRun.queryPlan, &pipelinePlanJson)
+                                            : worker.registerQuery(queryToRun.queryPlan, nullptr);
 
         /// Emplace potentially filled pipelinePlanJson in the vector of all the jsons
-        if (pipelinePlanJson)
+        if (visualizePlans)
         {
             pipelinePlanSerializations.emplace_back(pipelinePlanJson);
         }

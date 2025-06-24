@@ -58,11 +58,11 @@ public:
     /// Registers a DecomposedQueryPlan which internally triggers the QueryCompiler and registers the executable query plan. Once
     /// returned the query can be started with the QueryId. The registered Query will be in the StoppedState
     /// @param plan Fully Specified LogicalQueryPlan.
-    /// @param pipelinePlanSerialization Optional empty json. If the argument is passed, this json will be filled with the serialization of the pipeline query plan.
+    /// @param pipelinePlanJson Pointer to empty json. If the argument is not a nullptr, this json will be filled with the serialization of the pipeline query plan.
     /// It is necessary that the registerQuery function obtains this argument because it is the only function which generates the pipeline plan.
     /// After the function, the plan will already be lowered to compiled query plan.
     /// @return QueryId which identifies the registered Query
-    QueryId registerQuery(LogicalPlan plan, std::optional<nlohmann::json&> pipelinePlanSerialization);
+    QueryId registerQuery(LogicalPlan plan, nlohmann::json* pipelinePlanJson);
 
     /// Starts the Query asynchronously and moves it into the RunningState. Query execution error are only reported during runtime
     /// of the query.

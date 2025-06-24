@@ -24,6 +24,7 @@
 #include <Runtime/QueryTerminationType.hpp>
 #include <Util/PlanRenderer.hpp>
 #include <fmt/format.h>
+#include <nlohmann/json_fwd.hpp>
 #include <ErrorHandling.hpp>
 #include <QueryCompiler.hpp>
 #include <QueryOptimizer.hpp>
@@ -51,7 +52,7 @@ SingleNodeWorker::SingleNodeWorker(const Configuration::SingleNodeWorkerConfigur
 /// We might want to move this to the engine.
 static std::atomic queryIdCounter = INITIAL<QueryId>.getRawValue();
 
-QueryId SingleNodeWorker::registerQuery(LogicalPlan plan, std::optional<nlohmann::json&> pipelinePlanSerialization)
+QueryId SingleNodeWorker::registerQuery(LogicalPlan plan, nlohmann::json* pipelinePlanJson)
 {
     try
     {
@@ -59,7 +60,7 @@ QueryId SingleNodeWorker::registerQuery(LogicalPlan plan, std::optional<nlohmann
         auto queryPlan = optimizer->optimize(plan);
         listener->onEvent(SubmitQuerySystemEvent{queryPlan.getQueryId(), explain(plan, ExplainVerbosity::Debug)});
         auto request = std::make_unique<QueryCompilation::QueryCompilationRequest>(queryPlan);
-        auto result = compiler->compileQuery(std::move(request));
+        auto result = compiler->compileQuery(std::move(request), pipelinePlanJson);
         return nodeEngine->registerCompiledQueryPlan(std::move(result));
     }
     catch (Exception& e)
