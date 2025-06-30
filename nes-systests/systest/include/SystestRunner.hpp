@@ -67,6 +67,7 @@ runQueriesAtRemoteWorker(const std::vector<Query>& queries, uint64_t numConcurre
 
 
 /// Run queries sequentially locally and benchmark the run time of each query.
+/// If visualizePlans is set, the result json will contain the logical plan and the pipeline plan serialized as json graph structures
 /// @return vector containing failed queries
 [[nodiscard]] std::vector<RunningQuery> runQueriesAndBenchmark(
     const std::vector<Query>& queries, const Configuration::SingleNodeWorkerConfiguration& configuration, nlohmann::json& resultJson, bool visualizePlans);

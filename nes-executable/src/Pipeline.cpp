@@ -161,6 +161,11 @@ const std::vector<std::shared_ptr<Pipeline>>& Pipeline::getSuccessors() const
     return successorPipelines;
 }
 
+const std::vector<std::weak_ptr<Pipeline>>& Pipeline::getPredecessors() const
+{
+    return predecessorPipelines;
+}
+
 void Pipeline::clearSuccessors()
 {
     for (const auto& succ : successorPipelines)

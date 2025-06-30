@@ -74,6 +74,7 @@ struct Pipeline
 
     void removePredecessor(const Pipeline& pipeline);
     [[nodiscard]] const std::vector<std::shared_ptr<Pipeline>>& getSuccessors() const;
+    [[nodiscard]] const std::vector<std::weak_ptr<Pipeline>>& getPredecessors() const;
 
     void clearSuccessors();
     void clearPredecessors();
