@@ -13,7 +13,6 @@
 */
 
 syntax = "proto3";
-import "google/protobuf/any.proto";
 package NES;
 
 /// These messages are for the json serialization of the logical and pipeline plan, which are needed for the
@@ -25,11 +24,11 @@ package NES;
 
 /// The node of a logical plan graph. Depicts a logical operator. A logical plan graph consists of a list of these.
 message SerializableLogicalOperatorNode {
-  uint64 id = 1;
-  repeated uint64 inputs = 2;
+  uint32 id = 1;
+  repeated uint32 inputs = 2;
   string label = 3;
   string node_type = 4;
-  repeated uint64 outputs = 5;
+  repeated uint32 outputs = 5;
 }
 
 /// A pipeline plan consists of pipeline nodes, containing a single pipeline of the plan.
@@ -37,15 +36,15 @@ message SerializableLogicalOperatorNode {
 /// Since it is a pipeline, the operators of a pipeline should have at max 1 successor and predecessor.
 message PipelineNode {
   message SerializablePhysicalOperatorNode {
-    uint64 id = 1;
-    repeated uint64 inputs = 2;
+    uint32 id = 1;
+    repeated uint32 inputs = 2;
     string label = 3;
-    repeated uint64 outputs = 4;
+    repeated uint32 outputs = 4;
   }
 
   repeated SerializablePhysicalOperatorNode operators = 1;
-  uint64 pipeline_id = 2;
-  repeated uint64 predecessors = 3;
-  repeated uint64 successors = 4;
+  uint32 pipeline_id = 2;
+  repeated uint32 predecessors = 3;
+  repeated uint32 successors = 4;
 }
 
