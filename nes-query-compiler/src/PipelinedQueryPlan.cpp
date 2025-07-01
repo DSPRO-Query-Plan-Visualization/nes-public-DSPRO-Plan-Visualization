@@ -21,11 +21,15 @@
 #include <ranges>
 #include <string>
 #include <vector>
+
 #include <Identifiers/Identifiers.hpp>
 #include <Util/ExecutionMode.hpp>
+#include <google/protobuf/util/json_util.h>
 #include <nlohmann/json.hpp>
 #include <nlohmann/json_fwd.hpp>
 #include <Pipeline.hpp>
+#include <PipelinedQueryPlan.hpp>
+#include <SerializablePlanConbench.pb.h>
 
 namespace NES
 {
@@ -87,18 +91,23 @@ void PipelinedQueryPlan::addPipeline(const std::shared_ptr<Pipeline>& pipeline)
 
 /// Store pipeline id, predecessor ids, successor ids and list of serialized physical operators of a pipeline. Afterward, serialize all unseen successors.
 void serializePipelineRecursive(
-    nlohmann::json* resultJson, const std::shared_ptr<Pipeline>& pipeline, std::vector<uint64_t>& visitedPipelines)
+    std::vector<SerializablePipelineNode>& protoPipelines,
+    const std::shared_ptr<Pipeline>& pipeline,
+    std::vector<uint64_t>& visitedPipelines)
 {
+    /// Create the protobuf object for the current pipeline
+    SerializablePipelineNode serializedPipeline;
     uint64_t id = pipeline->getPipelineId().getRawValue();
+    serializedPipeline.set_pipeline_id(id);
+
+    /// Add pipleline id to list of visited pipelines
     visitedPipelines.push_back(id);
 
-    std::vector<uint64_t> successorIds;
     for (const auto& successor : pipeline->getSuccessors())
     {
-        successorIds.push_back(successor->getPipelineId().getRawValue());
+        serializedPipeline.add_successors(successor->getPipelineId().getRawValue());
     }
 
-    std::vector<uint64_t> predecessorIds;
     for (const auto& predecessor : pipeline->getPredecessors())
     {
         /// Since the predecessor might have been erased, we need to check if it still exists with lock.
@@ -107,7 +116,7 @@ void serializePipelineRecursive(
         /// We add a check regardless, to ensure safety.
         if (const auto sharedPtrPredecessor = predecessor.lock())
         {
-            predecessorIds.push_back(sharedPtrPredecessor->getPipelineId().getRawValue());
+            serializedPipeline.add_predecessors(sharedPtrPredecessor->getPipelineId().getRawValue());
         }
         else
         {
@@ -115,10 +124,9 @@ void serializePipelineRecursive(
         }
     }
 
-    /// Serialize the contained operators as a seperate json.
+    /// Serialize the contained operators as a seperate protobuf message.
     /// In a pipeline (as the name implies), each operator has mostly one successor, and mostly one predecessor.
     /// This makes displaying the parent-child relationships straight forward and does not require an additional getParents() function.
-    nlohmann::json pipelineOperators;
     auto currentOp = pipeline->getRootOperator();
     /// Note that the root operator cannot have a parent operator in the same pipeline
     /// In general, the root is either a scan operator or a source operator
@@ -128,21 +136,37 @@ void serializePipelineRecursive(
     {
         uint64_t currentId = currentOp.getId().getRawValue();
         std::string currentLabel = currentOp.toString();
-        std::vector<uint64_t> childIds = std::vector<uint64_t>{child->getId().getRawValue()};
-        pipelineOperators.push_back({{"id", currentId}, {"label", currentLabel}, {"inputs", parentIds}, {"outputs", childIds}});
-        parentIds = std::vector<uint64_t>{currentId};
+        uint64_t childId = child->getId().getRawValue();
+
+        /// Set all attributes of the operators protobuf message and add the operator to the pipeline's operators
+        SerializablePipelineNode_SerializablePhysicalOperatorNode* serializedOperator = serializedPipeline.add_operators();
+        serializedOperator->set_id(currentId);
+        serializedOperator->set_label(currentLabel);
+        for (auto parentId : parentIds)
+        {
+            serializedOperator->add_inputs(parentId);
+        }
+        serializedOperator->add_outputs(childId);
+
+        parentIds = std::vector{currentId};
         currentOp = child.value();
         child = currentOp.getChild();
     }
-    /// Add entry for the last operator of the pipeline
+    /// Add last operator of the pipeline
+    SerializablePipelineNode_SerializablePhysicalOperatorNode* serializedOperator = serializedPipeline.add_operators();
     uint64_t currentId = currentOp.getId().getRawValue();
     std::string currentLabel = currentOp.toString();
-    std::vector<uint64_t> childIds;
-    pipelineOperators.push_back({{"id", currentId}, {"label", currentLabel}, {"inputs", parentIds}, {"outputs", childIds}});
 
-    /// Create entry in the json of the plan
-    resultJson->push_back(
-        {{"pipeline_id", id}, {"operators", pipelineOperators}, {"successors", successorIds}, {"predecessors", predecessorIds}});
+    /// Set values of last operator message (no outputs are added, it's the last operator of the pipeline)
+    serializedOperator->set_id(currentId);
+    serializedOperator->set_label(currentLabel);
+    for (auto parentId : parentIds)
+    {
+        serializedOperator->add_inputs(parentId);
+    }
+
+    /// This pipeline message is fully created and can be pushed to the protoPipelines list
+    protoPipelines.push_back(serializedPipeline);
 
     /// Serialize all unseen successors
     for (const auto& successor : pipeline->getSuccessors())
@@ -150,10 +174,9 @@ void serializePipelineRecursive(
         uint64_t successorId = successor->getPipelineId().getRawValue();
         if (const auto foundId = std::ranges::find(visitedPipelines, successorId); foundId == visitedPipelines.end())
         {
-            serializePipelineRecursive(resultJson, successor, visitedPipelines);
+            serializePipelineRecursive(protoPipelines, successor, visitedPipelines);
         }
     }
-
 }
 
 void PipelinedQueryPlan::serializeAsJson(nlohmann::json* resultJson) const
@@ -161,10 +184,26 @@ void PipelinedQueryPlan::serializeAsJson(nlohmann::json* resultJson) const
     /// Vector of already visited pipeline ids.
     /// We need this to keep track of visited pipelines so we don't serialize a pipeline twice
     std::vector<uint64_t> visitedPipelines;
+
+    /// We create a vector for pipeline protobuf serializations, which will afterwards be used do get the list of json pipeline representations
+    std::vector<SerializablePipelineNode> protoPipelines = {};
     /// Iterate through all pipelines and serialize them.
     for (const auto& pipeline : pipelines)
     {
-        serializePipelineRecursive(resultJson, pipeline, visitedPipelines);
+        serializePipelineRecursive(protoPipelines, pipeline, visitedPipelines);
+    }
+
+    /// Include empty lists in the json, like an empty inputs list for a source
+    google::protobuf::util::JsonPrintOptions options;
+    options.always_print_fields_with_no_presence = true;
+
+    /// Transform protobuf list to json list
+    for (auto serializedPipeline : protoPipelines)
+    {
+        std::string pipeline_string;
+        absl::Status status = google::protobuf::util::MessageToJsonString(serializedPipeline, &pipeline_string, options);
+        const nlohmann::json pipelineJson = nlohmann::json::parse(pipeline_string);
+        resultJson->push_back(pipelineJson);
     }
 }
 

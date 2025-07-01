@@ -34,7 +34,7 @@ message SerializableLogicalOperatorNode {
 /// A pipeline plan consists of pipeline nodes, containing a single pipeline of the plan.
 /// A pipeline itself consists of its id and multiple operators in it.
 /// Since it is a pipeline, the operators of a pipeline should have at max 1 successor and predecessor.
-message PipelineNode {
+message SerializablePipelineNode {
   message SerializablePhysicalOperatorNode {
     uint32 id = 1;
     repeated uint32 inputs = 2;
