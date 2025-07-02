@@ -42,6 +42,7 @@
 #include <nlohmann/json_fwd.hpp>
 #include <ErrorHandling.hpp>
 #include <NebuLI.hpp>
+#include <SerializablePlanConbench.pb.h>
 #include <SingleNodeWorker.hpp>
 #include <SingleNodeWorkerRPCService.pb.h>
 #include <SystestGrpc.hpp>
@@ -445,52 +446,67 @@ runQueriesAtRemoteWorker(const std::vector<Query>& queries, const uint64_t numCo
     return failedQueries.copy();
 }
 
-/// Serializes a logical operator to a json representation. Will serialize the children beforehand and not serialize it, if it was already visited
-void serializeOperatorToJson(LogicalPlan plan, LogicalOperator& op, std::vector<uint64_t>& foundOps, nlohmann::json& resultJson)
+/// Serializes a logical operator to a protobuf representation. Will serialize the children beforehand and not serialize the operator, if it was already visited.
+void serializeOperatorToJson(
+    LogicalPlan plan, LogicalOperator& op, std::vector<uint64_t>& foundOps, std::vector<SerializableLogicalOperatorNode>& operatorList)
 {
     if (const auto id = std::ranges::find(foundOps, op.getId().getRawValue()); id == foundOps.end())
     {
-        /// If we have not visited this op before, we visit it now and create its entry in the resultJson
+        SerializableLogicalOperatorNode serializedOperator;
+        /// If we have not visited this op before, we visit it now and create its entry in the operatorList
         uint64_t opId = op.getId().getRawValue();
+        serializedOperator.set_id(opId);
         foundOps.emplace_back(opId);
         std::string opType(op.getName());
+        serializedOperator.set_node_type(opType);
 
         /// Get all parent operator ids of this operator
         std::vector<LogicalOperator> parents = getParents(plan, op);
         std::vector<uint64_t> parentIds;
         for (const auto& parent : parents)
         {
-            parentIds.emplace_back(parent.getId().getRawValue());
+            serializedOperator.add_outputs(parent.getId().getRawValue());
         }
 
         std::vector<uint64_t> childrenIds;
         for (auto child : op.getChildren())
         {
             /// Serialize children and get their ids
-            serializeOperatorToJson(plan, child, foundOps, resultJson);
-            childrenIds.emplace_back(child.getId().getRawValue());
+            serializeOperatorToJson(plan, child, foundOps, operatorList);
+            serializedOperator.add_inputs(child.getId().getRawValue());
         }
 
         std::string opLabel = op.explain(ExplainVerbosity::Short);
-
-        resultJson.push_back({
-            {"id", opId},
-            {"node_type", opType},
-            {"label", opLabel},
-            {"inputs", childrenIds},
-            {"outputs", parentIds},
-        });
+        serializedOperator.set_label(opLabel);
+        operatorList.emplace_back(serializedOperator);
     }
 }
 
 /// Function to start off the json serialization of the logical query plan operators
-/// Takes each sink of the query and recursively adds the serializations of the sink and its children to the json
+/// Takes each sink of the query and recursively adds the serializations of the sink and its children to the serialization list.
+/// Serialization of a single operator happens as protobuf serialization. The list of protobuf objects is then transformed to a list of json objects.
 void serializeQueryToJson(LogicalPlan plan, nlohmann::json& resultJson)
 {
     std::vector<uint64_t> foundOps = std::vector<uint64_t>();
+    std::vector<SerializableLogicalOperatorNode> operators = {};
+
+    /// Serialize operators as protobuf objects
     for (auto rootOp : plan.rootOperators)
     {
-        serializeOperatorToJson(plan, rootOp, foundOps, resultJson);
+        serializeOperatorToJson(plan, rootOp, foundOps, operators);
+    }
+
+    /// Include empty lists in the json, like an empty inputs list for a source
+    google::protobuf::util::JsonPrintOptions options;
+    options.always_print_fields_with_no_presence = true;
+
+    /// Transform protobuf list to json list
+    for (auto serializedOp : operators)
+    {
+        std::string op_string;
+        absl::Status status = google::protobuf::util::MessageToJsonString(serializedOp, &op_string, options);
+        const nlohmann::json opJson = nlohmann::json::parse(op_string);
+        resultJson.push_back(opJson);
     }
 }
 
