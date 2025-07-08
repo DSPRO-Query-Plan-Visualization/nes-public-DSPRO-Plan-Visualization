@@ -35,6 +35,7 @@ void MapPhysicalOperator::execute(ExecutionContext& ctx, Record& record) const
     /// write the result to the record
     record.write(fieldToWriteTo, value);
     /// call next operator
+    /// Increment passing tuples
     executeChild(ctx, record);
 }
 

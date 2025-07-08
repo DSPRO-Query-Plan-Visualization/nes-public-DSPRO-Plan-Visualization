@@ -39,8 +39,9 @@ SingleNodeWorker::SingleNodeWorker(SingleNodeWorker&& other) noexcept = default;
 SingleNodeWorker& SingleNodeWorker::operator=(SingleNodeWorker&& other) noexcept = default;
 
 SingleNodeWorker::SingleNodeWorker(const Configuration::SingleNodeWorkerConfiguration& configuration)
-    : listener(std::make_shared<PrintingStatisticListener>(
-          fmt::format("nes-stats-{:%H:%M:%S}-{}.txt", std::chrono::system_clock::now(), ::getpid())))
+    : listener(
+          std::make_shared<PrintingStatisticListener>(
+              fmt::format("nes-stats-{:%H:%M:%S}-{}.txt", std::chrono::system_clock::now(), ::getpid())))
     , nodeEngine(NodeEngineBuilder(configuration.workerConfiguration, listener, listener).build())
     , bufferSize(configuration.workerConfiguration.bufferSizeInBytes.getValue())
     , optimizer(std::make_unique<QueryOptimizer>(configuration.workerConfiguration.queryOptimizer))
@@ -52,7 +53,8 @@ SingleNodeWorker::SingleNodeWorker(const Configuration::SingleNodeWorkerConfigur
 /// We might want to move this to the engine.
 static std::atomic queryIdCounter = INITIAL<QueryId>.getRawValue();
 
-QueryId SingleNodeWorker::registerQuery(LogicalPlan plan, nlohmann::json* pipelinePlanJson)
+QueryId
+SingleNodeWorker::registerQuery(LogicalPlan plan, nlohmann::json* pipelinePlanJson, std::vector<std::shared_ptr<Pipeline>>* pipelines)
 {
     try
     {
@@ -61,6 +63,12 @@ QueryId SingleNodeWorker::registerQuery(LogicalPlan plan, nlohmann::json* pipeli
         listener->onEvent(SubmitQuerySystemEvent{queryPlan.getQueryId(), explain(plan, ExplainVerbosity::Debug)});
         auto request = std::make_unique<QueryCompilation::QueryCompilationRequest>(queryPlan);
         auto result = compiler->compileQuery(std::move(request), pipelinePlanJson);
+        /// If pipelinePlanJson exists, it means that we want to visualize the query plan
+        /// In this case, we also need to fill pipelines with the pipelines of the plan
+        if (pipelinePlanJson)
+        {
+            *pipelines = result->getPipelines();
+        }
         return nodeEngine->registerCompiledQueryPlan(std::move(result));
     }
     catch (Exception& e)

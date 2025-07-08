@@ -39,6 +39,12 @@ public:
     void start(PipelineExecutionContext& pipelineExecutionContext) override;
     void execute(const Memory::TupleBuffer& inputTupleBuffer, PipelineExecutionContext& pipelineExecutionContext) override;
     void stop(PipelineExecutionContext& pipelineExecutionContext) override;
+    /// Returns pointer to pipeline
+    /// Currently for benchmarking purposes only, since the benchmarking method needs to read the operator's passed tuples after the query ran
+    std::shared_ptr<Pipeline> getPipeline()
+    {
+        return pipeline;
+    }
 
 protected:
     std::ostream& toString(std::ostream& os) const override;

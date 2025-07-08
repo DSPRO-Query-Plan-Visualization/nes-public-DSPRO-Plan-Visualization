@@ -62,7 +62,7 @@ public:
     /// It is necessary that the registerQuery function obtains this argument because it is the only function which generates the pipeline plan.
     /// After the function, the plan will already be lowered to compiled query plan.
     /// @return QueryId which identifies the registered Query
-    QueryId registerQuery(LogicalPlan plan, nlohmann::json* pipelinePlanJson);
+    QueryId registerQuery(LogicalPlan plan, nlohmann::json* pipelinePlanJson, std::vector<std::shared_ptr<Pipeline>>* pipelines);
 
     /// Starts the Query asynchronously and moves it into the RunningState. Query execution error are only reported during runtime
     /// of the query.

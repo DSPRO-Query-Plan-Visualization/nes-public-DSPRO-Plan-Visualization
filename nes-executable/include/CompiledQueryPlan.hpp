@@ -18,9 +18,11 @@
 #include <variant>
 #include <vector>
 #include <Identifiers/Identifiers.hpp>
+#include <Pipelines/CompiledExecutablePipelineStage.hpp>
 #include <Sinks/SinkDescriptor.hpp>
 #include <Sources/SourceDescriptor.hpp>
 #include <ExecutablePipelineStage.hpp>
+#include <Pipeline.hpp>
 
 namespace NES
 {
@@ -60,6 +62,21 @@ struct CompiledQueryPlan
 {
     static std::unique_ptr<CompiledQueryPlan> create(
         QueryId queryId, std::vector<std::shared_ptr<ExecutablePipeline>> pipelines, std::vector<Sink> sinks, std::vector<Source> sources);
+
+    /// Returns a vector with all pipelines containing operators
+    /// The benchmarking method uses this to obtain access to the shared ptrs of the operators
+    std::vector<std::shared_ptr<Pipeline>> getPipelines() const
+    {
+        std::vector<std::shared_ptr<Pipeline>> abstractPipelines;
+        for (const auto& execPipeline : pipelines)
+        {
+            if (auto *const compiledExecPipelineStage = dynamic_cast<CompiledExecutablePipelineStage*>(execPipeline->stage.get()))
+            {
+                abstractPipelines.emplace_back(compiledExecPipelineStage->getPipeline());
+            }
+        }
+        return abstractPipelines;
+    }
 
     QueryId queryId;
     std::vector<std::shared_ptr<ExecutablePipeline>> pipelines;

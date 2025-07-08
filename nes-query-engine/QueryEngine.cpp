@@ -417,8 +417,8 @@ private:
     std::shared_ptr<Memory::AbstractBufferProvider> bufferProvider;
     std::atomic<TaskId::Underlying> taskIdCounter;
 
-    detail::Queue admissionQueue;
-    detail::Queue internalTaskQueue;
+    NES::detail::Queue admissionQueue;
+    NES::detail::Queue internalTaskQueue;
 
     /// Class Invariant: numberOfThreads == pool.size().
     /// We don't want to expose the vector directly to anyone, as this would introduce a race condition.

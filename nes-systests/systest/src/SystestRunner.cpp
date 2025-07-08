@@ -188,7 +188,7 @@ std::vector<LoadedQueryPlan> loadFromSLTFile(
                     return "";
                 }
                 const auto intoLength = std::string("INTO").length();
-                auto trimmedSinkName = std::string(Util::trimWhiteSpaces(query.substr(intoClause + intoLength)));
+                auto trimmedSinkName = std::string(NES::Util::trimWhiteSpaces(query.substr(intoClause + intoLength)));
 
                 /// As the sink name might have a semicolon at the end, we remove it
                 if (trimmedSinkName.back() == ';')
@@ -290,7 +290,7 @@ std::vector<RunningQuery> runQueriesAtLocalWorker(
                         finishedProducing = true;
                         return;
                     }
-                    const auto queryId = worker.registerQuery(query.queryPlan, nullptr);
+                    const auto queryId = worker.registerQuery(query.queryPlan, nullptr, nullptr);
                     if (queryId == INVALID_QUERY_ID)
                     {
                         throw QueryInvalid("Received an invalid query id from the worker");
@@ -584,18 +584,16 @@ std::vector<RunningQuery> runQueriesAndBenchmark(
     for (const auto& queryToRun : queries)
     {
         auto pipelinePlanJson = nlohmann::json();
+        /// In this vector, we store the pointers to the pipelines of the query
+        /// After the query finished running, we can gain additional benchmarking information from the operators of the pipeline
+        std::vector<std::shared_ptr<Pipeline>> pipelines;
 
-        /// Pass the pipelineJson as raw pointer into the function, if we want to visualise our queries
-        /// Otherwise pass nullptr
+        /// Pass the pipelineJson and the vector of pipelines as raw pointer into the function, if we want to visualise our queries
+        /// Otherwise pass 2 nullptrs
         /// This is currently a hotfix for not being able to set std::optional<class&> as arguments
-        const auto queryId = visualizePlans ? worker.registerQuery(queryToRun.queryPlan, &pipelinePlanJson)
-                                            : worker.registerQuery(queryToRun.queryPlan, nullptr);
+        const auto queryId = visualizePlans ? worker.registerQuery(queryToRun.queryPlan, &pipelinePlanJson, &pipelines)
+                                            : worker.registerQuery(queryToRun.queryPlan, nullptr, nullptr);
 
-        /// Emplace potentially filled pipelinePlanJson in the vector of all the jsons
-        if (visualizePlans)
-        {
-            pipelinePlanSerializations.emplace_back(pipelinePlanJson);
-        }
         RunningQuery currentRunningQuery(queryToRun, queryId);
         {
             /// Measuring the time it takes from registering the query till unregistering / completion
@@ -608,6 +606,13 @@ std::vector<RunningQuery> runQueriesAndBenchmark(
             }
             worker.unregisterQuery(queryId);
             currentRunningQuery.querySummary = summary;
+        }
+
+        /// Emplace potentially filled pipelinePlanJson in the vector of all the jsons
+        if (visualizePlans)
+        {
+            pipelinePlanSerializations.emplace_back(pipelinePlanJson);
+            std::cout << pipelines[0]->getPipelineId() << '\n';
         }
 
         /// Getting the size and no. tuples of all input files to pass this information to currentRunningQuery.bytesProcessed

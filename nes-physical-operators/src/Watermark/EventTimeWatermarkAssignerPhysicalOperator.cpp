@@ -55,6 +55,7 @@ void EventTimeWatermarkAssignerPhysicalOperator::execute(ExecutionContext& ctx, 
         state->currentWatermark = tsField;
     }
     /// call next operator
+    /// Increment passing tuples
     executeChild(ctx, record);
 }
 
