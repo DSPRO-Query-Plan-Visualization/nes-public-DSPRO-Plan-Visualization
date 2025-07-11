@@ -21,8 +21,8 @@
 #include <Pipelines/CompiledExecutablePipelineStage.hpp>
 #include <Sinks/SinkDescriptor.hpp>
 #include <Sources/SourceDescriptor.hpp>
+#include <Util/Common.hpp>
 #include <ExecutablePipelineStage.hpp>
-#include <Pipeline.hpp>
 
 namespace NES
 {
@@ -63,19 +63,18 @@ struct CompiledQueryPlan
     static std::unique_ptr<CompiledQueryPlan> create(
         QueryId queryId, std::vector<std::shared_ptr<ExecutablePipeline>> pipelines, std::vector<Sink> sinks, std::vector<Source> sources);
 
-    /// Returns a vector with all pipelines containing operators
-    /// The benchmarking method uses this to obtain access to the shared ptrs of the operators
-    std::vector<std::shared_ptr<Pipeline>> getPipelines() const
+    /// Fills up a map with shared pointers to the atomic incomingTuples counters of all CompiledExecutablePipelineStages of this plan
+    /// This information is needed to display the query plan as graph on Conbench
+    void getPassingTuplesMap(std::unordered_map<uint64_t, std::shared_ptr<std::atomic<uint64_t>>>* stageMap) const
     {
-        std::vector<std::shared_ptr<Pipeline>> abstractPipelines;
-        for (const auto& execPipeline : pipelines)
+        for (const auto& pipeline : pipelines)
         {
-            if (auto *const compiledExecPipelineStage = dynamic_cast<CompiledExecutablePipelineStage*>(execPipeline->stage.get()))
+            uint64_t id = pipeline->id.getRawValue();
+            if (NES::Util::instanceOf<CompiledExecutablePipelineStage>(pipeline->stage))
             {
-                abstractPipelines.emplace_back(compiledExecPipelineStage->getPipeline());
+                (*stageMap)[id] = pipeline->stage->getIncomingTuples();
             }
         }
-        return abstractPipelines;
     }
 
     QueryId queryId;

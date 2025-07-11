@@ -90,7 +90,6 @@ void NLJOperatorHandler::emitSliceIdsToProbe(
     bufferMemory->windowInfo = windowInfo;
 
     /// Dispatching the buffer to the probe operator via the task queue.
-    /// Increment passing tuples
     pipelineCtx->emitBuffer(tupleBuffer);
 
     NES_TRACE(

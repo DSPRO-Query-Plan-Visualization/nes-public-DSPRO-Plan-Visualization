@@ -24,7 +24,6 @@ namespace NES
 void UnionPhysicalOperator::execute(ExecutionContext& ctx, Record& record) const
 {
     /// Path-through, will be optimized out during query compilation
-    /// Increment passing tuples (we must check if this really works)
     executeChild(ctx, record);
 }
 

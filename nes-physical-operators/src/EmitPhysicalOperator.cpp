@@ -146,7 +146,6 @@ void EmitPhysicalOperator::emitRecordBuffer(
     recordBuffer.setChunkNumber(getNextChunkNr(ctx, operatorHandlerId));
     recordBuffer.setLastChunk(isLastChunk);
     recordBuffer.setCreationTs(ctx.currentTs);
-    /// Increase passing tuples for pipeline
     ctx.emitBuffer(recordBuffer);
 
     if (isLastChunk == true)

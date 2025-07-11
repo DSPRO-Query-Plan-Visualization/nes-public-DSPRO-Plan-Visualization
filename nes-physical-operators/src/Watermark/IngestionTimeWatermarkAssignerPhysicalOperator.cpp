@@ -45,7 +45,6 @@ void IngestionTimeWatermarkAssignerPhysicalOperator::open(ExecutionContext& exec
 
 void IngestionTimeWatermarkAssignerPhysicalOperator::execute(ExecutionContext& executionCtx, Record& record) const
 {
-    /// Increment passing tuples
     executeChild(executionCtx, record);
 }
 

@@ -41,6 +41,13 @@ public:
     /// `stop` may throw to indicate an error.
     virtual void stop(PipelineExecutionContext& pipelineExecutionContext) = 0;
 
+    /// Returns the incomingTuples counter as shared pointer, if the concrete stage accumulates them
+    /// Returns nullptr when not overridden
+    virtual std::shared_ptr<std::atomic<uint64_t>> getIncomingTuples() const
+    {
+        return nullptr;
+    }
+
     friend std::ostream& operator<<(std::ostream& os, const ExecutablePipelineStage& eps) { return eps.toString(os); }
 
 protected:

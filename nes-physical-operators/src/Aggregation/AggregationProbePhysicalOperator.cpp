@@ -137,7 +137,6 @@ void AggregationProbePhysicalOperator::open(ExecutionContext& executionCtx, Reco
         outputRecord.reassignFields(recordKey);
         outputRecord.write(windowMetaData.windowStartFieldName, windowStart.convertToValue());
         outputRecord.write(windowMetaData.windowEndFieldName, windowEnd.convertToValue());
-        /// Increase number of output tuples
         executeChild(executionCtx, outputRecord);
     }
 

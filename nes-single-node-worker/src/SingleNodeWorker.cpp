@@ -54,7 +54,7 @@ SingleNodeWorker::SingleNodeWorker(const Configuration::SingleNodeWorkerConfigur
 static std::atomic queryIdCounter = INITIAL<QueryId>.getRawValue();
 
 QueryId
-SingleNodeWorker::registerQuery(LogicalPlan plan, nlohmann::json* pipelinePlanJson, std::vector<std::shared_ptr<Pipeline>>* pipelines)
+SingleNodeWorker::registerQuery(LogicalPlan plan, nlohmann::json* pipelinePlanJson, std::unordered_map<uint64_t, std::shared_ptr<std::atomic<uint64_t>>>* incomingTuplesMap)
 {
     try
     {
@@ -63,11 +63,11 @@ SingleNodeWorker::registerQuery(LogicalPlan plan, nlohmann::json* pipelinePlanJs
         listener->onEvent(SubmitQuerySystemEvent{queryPlan.getQueryId(), explain(plan, ExplainVerbosity::Debug)});
         auto request = std::make_unique<QueryCompilation::QueryCompilationRequest>(queryPlan);
         auto result = compiler->compileQuery(std::move(request), pipelinePlanJson);
-        /// If pipelinePlanJson exists, it means that we want to visualize the query plan
-        /// In this case, we also need to fill pipelines with the pipelines of the plan
-        if (pipelinePlanJson)
+
+        /// Check if a pointer to the incomingTuplesMap was given. If yes, add the incoming tuples pointer for each intermediate executable pipeline to the map
+        if (incomingTuplesMap)
         {
-            *pipelines = result->getPipelines();
+            result->getPassingTuplesMap(incomingTuplesMap);
         }
         return nodeEngine->registerCompiledQueryPlan(std::move(result));
     }

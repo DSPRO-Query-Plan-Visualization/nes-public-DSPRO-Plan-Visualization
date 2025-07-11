@@ -46,6 +46,8 @@ CompiledExecutablePipelineStage::CompiledExecutablePipelineStage(
 void CompiledExecutablePipelineStage::execute(
     const Memory::TupleBuffer& inputTupleBuffer, PipelineExecutionContext& pipelineExecutionContext)
 {
+    /// Increase the number of incoming tuples
+    incomingTuples->fetch_add(inputTupleBuffer.getNumberOfTuples(), std::memory_order_relaxed);
     /// we call the compiled pipeline function with an input buffer and the execution context
     pipelineExecutionContext.setOperatorHandlers(operatorHandlers);
     Arena arena(pipelineExecutionContext.getBufferManager());
@@ -80,6 +82,11 @@ void CompiledExecutablePipelineStage::stop(PipelineExecutionContext& pipelineExe
     Arena arena(pipelineExecutionContext.getBufferManager());
     ExecutionContext ctx(std::addressof(pipelineExecutionContext), std::addressof(arena));
     pipeline->getRootOperator().terminate(ctx);
+}
+
+std::shared_ptr<std::atomic<uint64_t>> CompiledExecutablePipelineStage::getIncomingTuples() const
+{
+    return incomingTuples;
 }
 
 std::ostream& CompiledExecutablePipelineStage::toString(std::ostream& os) const

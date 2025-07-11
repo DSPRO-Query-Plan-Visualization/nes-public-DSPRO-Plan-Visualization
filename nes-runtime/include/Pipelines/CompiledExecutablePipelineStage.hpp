@@ -39,12 +39,7 @@ public:
     void start(PipelineExecutionContext& pipelineExecutionContext) override;
     void execute(const Memory::TupleBuffer& inputTupleBuffer, PipelineExecutionContext& pipelineExecutionContext) override;
     void stop(PipelineExecutionContext& pipelineExecutionContext) override;
-    /// Returns pointer to pipeline
-    /// Currently for benchmarking purposes only, since the benchmarking method needs to read the operator's passed tuples after the query ran
-    std::shared_ptr<Pipeline> getPipeline()
-    {
-        return pipeline;
-    }
+    std::shared_ptr<std::atomic<uint64_t>> getIncomingTuples() const override;
 
 protected:
     std::ostream& toString(std::ostream& os) const override;
@@ -56,6 +51,9 @@ private:
     nautilus::engine::CallableFunction<void, PipelineExecutionContext*, const Memory::TupleBuffer*, const Arena*> compiledPipelineFunction;
     std::unordered_map<OperatorHandlerId, std::shared_ptr<OperatorHandler>> operatorHandlers;
     std::shared_ptr<Pipeline> pipeline;
+    /// Counts the incoming tuples for this pipeline in a thread safe manner
+    /// The counter is incremented by counting the number of tuples in the tuple buffer everytime, this stage is executed-
+    std::shared_ptr<std::atomic<uint64_t>> incomingTuples = std::make_shared<std::atomic<uint64_t>>(0);
 };
 
 }
