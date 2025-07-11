@@ -55,23 +55,27 @@ using Successor = std::optional<std::shared_ptr<ExecutablePipeline>>;
 std::shared_ptr<ExecutablePipeline> processOperatorPipeline(
     const std::shared_ptr<Pipeline>& pipeline,
     const std::shared_ptr<PipelinedQueryPlan>& pipelineQueryPlan,
-    LoweringContext& loweringContext);
+    LoweringContext& loweringContext,
+    const bool countIncomingTuples);
 void processSink(const Predecessor& predecessor, const std::shared_ptr<Pipeline>& pipeline, LoweringContext& loweringContext);
 Successor processSuccessor(
     const Predecessor& predecessor,
     const std::shared_ptr<Pipeline>& pipeline,
     const std::shared_ptr<PipelinedQueryPlan>& pipelineQueryPlan,
-    LoweringContext& loweringContext);
+    LoweringContext& loweringContext,
+    const bool countIncomingTuples);
 void processSource(
     const std::shared_ptr<Pipeline>& pipeline,
     const std::shared_ptr<PipelinedQueryPlan>& pipelineQueryPlan,
-    LoweringContext& loweringContext);
+    LoweringContext& loweringContext,
+    const bool countIncomingTuples);
 
 Successor processSuccessor(
     const Predecessor& predecessor,
     const std::shared_ptr<Pipeline>& pipeline,
     const std::shared_ptr<PipelinedQueryPlan>& pipelineQueryPlan,
-    LoweringContext& loweringContext)
+    LoweringContext& loweringContext,
+    const bool countIncomingTuples)
 {
     PRECONDITION(pipeline->isSinkPipeline() || pipeline->isOperatorPipeline(), "expected a Sink or OperatorPipeline");
 
@@ -80,13 +84,14 @@ Successor processSuccessor(
         processSink(predecessor, pipeline, loweringContext);
         return {};
     }
-    return processOperatorPipeline(pipeline, pipelineQueryPlan, loweringContext);
+    return processOperatorPipeline(pipeline, pipelineQueryPlan, loweringContext, countIncomingTuples);
 }
 
 void processSource(
     const std::shared_ptr<Pipeline>& pipeline,
     const std::shared_ptr<PipelinedQueryPlan>& pipelineQueryPlan,
-    LoweringContext& loweringContext)
+    LoweringContext& loweringContext,
+    const bool countIncomingTuples)
 {
     PRECONDITION(pipeline->isSourcePipeline(), "expected a SourcePipeline {}", *pipeline);
 
@@ -107,7 +112,8 @@ void processSource(
 
     for (const auto& successor : pipeline->getSuccessors())
     {
-        if (auto executableSuccessor = processSuccessor(executableInputFormatterPipeline, successor, pipelineQueryPlan, loweringContext))
+        if (auto executableSuccessor
+            = processSuccessor(executableInputFormatterPipeline, successor, pipelineQueryPlan, loweringContext, countIncomingTuples))
         {
             executableInputFormatterPipeline->successors.emplace_back(*executableSuccessor);
         }
@@ -131,7 +137,7 @@ void processSink(const Predecessor& predecessor, const std::shared_ptr<Pipeline>
 }
 
 std::unique_ptr<ExecutablePipelineStage>
-getStage(const std::shared_ptr<Pipeline>& pipeline, Nautilus::Configurations::ExecutionMode executionMode)
+getStage(const std::shared_ptr<Pipeline>& pipeline, Nautilus::Configurations::ExecutionMode executionMode, const bool countIncomingTuples)
 {
     nautilus::engine::Options options;
     switch (executionMode)
@@ -151,13 +157,14 @@ getStage(const std::shared_ptr<Pipeline>& pipeline, Nautilus::Configurations::Ex
     options.setOption("toConsole", true);
     options.setOption("toFile", true);
 
-    return std::make_unique<CompiledExecutablePipelineStage>(pipeline, pipeline->getOperatorHandlers(), options);
+    return std::make_unique<CompiledExecutablePipelineStage>(pipeline, pipeline->getOperatorHandlers(), options, countIncomingTuples);
 }
 
 std::shared_ptr<ExecutablePipeline> processOperatorPipeline(
     const std::shared_ptr<Pipeline>& pipeline,
     const std::shared_ptr<PipelinedQueryPlan>& pipelineQueryPlan,
-    LoweringContext& loweringContext)
+    LoweringContext& loweringContext,
+    const bool countIncomingTuples)
 {
     /// check if the particular pipeline already exist in the pipeline map.
     if (const auto executable = loweringContext.pipelineToExecutableMap.find(pipeline->getPipelineId());
@@ -165,12 +172,13 @@ std::shared_ptr<ExecutablePipeline> processOperatorPipeline(
     {
         return executable->second;
     }
-    auto executablePipeline
-        = ExecutablePipeline::create(PipelineId(pipeline->getPipelineId()), getStage(pipeline, pipelineQueryPlan->getExecutionMode()), {});
+    auto executablePipeline = ExecutablePipeline::create(
+        PipelineId(pipeline->getPipelineId()), getStage(pipeline, pipelineQueryPlan->getExecutionMode(), countIncomingTuples), {});
 
     for (const auto& successor : pipeline->getSuccessors())
     {
-        if (auto executableSuccessor = processSuccessor(executablePipeline, successor, pipelineQueryPlan, loweringContext))
+        if (auto executableSuccessor
+            = processSuccessor(executablePipeline, successor, pipelineQueryPlan, loweringContext, countIncomingTuples))
         {
             executablePipeline->successors.emplace_back(*executableSuccessor);
         }
@@ -181,14 +189,14 @@ std::shared_ptr<ExecutablePipeline> processOperatorPipeline(
 }
 }
 
-std::unique_ptr<CompiledQueryPlan> apply(const std::shared_ptr<PipelinedQueryPlan>& pipelineQueryPlan)
+std::unique_ptr<CompiledQueryPlan> apply(const std::shared_ptr<PipelinedQueryPlan>& pipelineQueryPlan, const bool countIncomingTuples)
 {
     LoweringContext loweringContext;
     ///Process all pipelines recursively.
     auto sourcePipelines = pipelineQueryPlan->getSourcePipelines();
     for (const auto& pipeline : sourcePipelines)
     {
-        processSource(pipeline, pipelineQueryPlan, loweringContext);
+        processSource(pipeline, pipelineQueryPlan, loweringContext, countIncomingTuples);
     }
 
     auto pipelines = std::move(loweringContext.pipelineToExecutableMap) | std::views::values | std::ranges::to<std::vector>();

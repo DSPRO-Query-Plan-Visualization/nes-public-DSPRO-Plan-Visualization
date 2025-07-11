@@ -29,12 +29,15 @@ std::unique_ptr<CompiledQueryPlan> QueryCompiler::compileQuery(std::unique_ptr<Q
 {
     try
     {
+        /// If we want to visualize the plan on Conbench, the pipelinePlanJson pointer is not null
+        /// In this case, we create a json representation of the pipelinePlan and also prompt the CompiledExecutablePipeline stages to count the number of incoming tuples.
+        const bool visualizePlan = static_cast<bool>(pipelinePlanJson);
         auto pipelinedQueryPlan = PipeliningPhase::apply(request->queryPlan);
-        if (pipelinePlanJson)
+        if (visualizePlan)
         {
             pipelinedQueryPlan->serializeAsJson(pipelinePlanJson);
         }
-        return LowerToCompiledQueryPlanPhase::apply(pipelinedQueryPlan);
+        return LowerToCompiledQueryPlanPhase::apply(pipelinedQueryPlan, visualizePlan);
     }
     catch (...)
     {

@@ -20,5 +20,5 @@
 
 namespace NES::QueryCompilation::LowerToCompiledQueryPlanPhase
 {
-std::unique_ptr<CompiledQueryPlan> apply(const std::shared_ptr<PipelinedQueryPlan>& pipelineQueryPlan);
+std::unique_ptr<CompiledQueryPlan> apply(const std::shared_ptr<PipelinedQueryPlan>& pipelineQueryPlan, const bool countIncomingTuples);
 }
