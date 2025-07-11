@@ -1,0 +1,495 @@
+[
+    {
+        "bytesPerSecond": 808930.4477211986,
+        "query name": "ClusterMonitoring_0",
+        "serializedLogicalPlan": [
+            {
+                "id": 8,
+                "inputs": [],
+                "label": "SOURCE(lrb)",
+                "nodeType": "Source",
+                "outputs": [
+                    2
+                ]
+            },
+            {
+                "id": 2,
+                "inputs": [
+                    8
+                ],
+                "label": "MAP(lrb$positionDiv5280 = lrb$position / 5280)",
+                "nodeType": "Map",
+                "outputs": [
+                    3
+                ]
+            },
+            {
+                "id": 3,
+                "inputs": [
+                    2
+                ],
+                "label": "PROJECTION(schema: lrb$creationTS:UINT64 lrb$highway:INT16 lrb$direction:INT16 lrb$positionDiv5280:INT32 lrb$speed:FLOAT32)",
+                "nodeType": "Projection",
+                "outputs": [
+                    4
+                ]
+            },
+            {
+                "id": 4,
+                "inputs": [
+                    3
+                ],
+                "label": "WATERMARK_ASSIGNER(Event time)",
+                "nodeType": "EventTimeWatermarkAssigner",
+                "outputs": [
+                    5
+                ]
+            },
+            {
+                "id": 5,
+                "inputs": [
+                    4
+                ],
+                "label": "SlidingWindow AGG(lrb$avgSpeed = Avg(lrb$speed))",
+                "nodeType": "WindowedAggregation",
+                "outputs": [
+                    6
+                ]
+            },
+            {
+                "id": 6,
+                "inputs": [
+                    5
+                ],
+                "label": "SELECTION(lrb$avgSpeed < 40)",
+                "nodeType": "Selection",
+                "outputs": [
+                    7
+                ]
+            },
+            {
+                "id": 7,
+                "inputs": [
+                    6
+                ],
+                "label": "SINK(CHECKSUM0)",
+                "nodeType": "Sink",
+                "outputs": []
+            }
+        ],
+        "serializedPipelinePlan": [
+            {
+                "incomingTuples": 0,
+                "operators": [
+                    {
+                        "id": 9,
+                        "inputs": [],
+                        "label": "PhysicalOperator(NES::SourcePhysicalOperator)",
+                        "outputs": []
+                    }
+                ],
+                "pipelineId": 1,
+                "predecessors": [],
+                "successors": [
+                    2
+                ]
+            },
+            {
+                "incomingTuples": 16384,
+                "operators": [
+                    {
+                        "id": 10,
+                        "inputs": [],
+                        "label": "PhysicalOperator(NES::ScanPhysicalOperator)",
+                        "outputs": [
+                            8
+                        ]
+                    },
+                    {
+                        "id": 8,
+                        "inputs": [
+                            10
+                        ],
+                        "label": "PhysicalOperator(NES::MapPhysicalOperator)",
+                        "outputs": [
+                            11
+                        ]
+                    },
+                    {
+                        "id": 11,
+                        "inputs": [
+                            8
+                        ],
+                        "label": "PhysicalOperator(NES::EmitPhysicalOperator)",
+                        "outputs": []
+                    }
+                ],
+                "pipelineId": 2,
+                "predecessors": [
+                    1
+                ],
+                "successors": [
+                    3
+                ]
+            },
+            {
+                "incomingTuples": 16384,
+                "operators": [
+                    {
+                        "id": 6,
+                        "inputs": [],
+                        "label": "PhysicalOperator(NES::ScanPhysicalOperator)",
+                        "outputs": [
+                            7
+                        ]
+                    },
+                    {
+                        "id": 7,
+                        "inputs": [
+                            6
+                        ],
+                        "label": "PhysicalOperator(NES::EmitPhysicalOperator)",
+                        "outputs": []
+                    }
+                ],
+                "pipelineId": 3,
+                "predecessors": [
+                    2
+                ],
+                "successors": [
+                    4
+                ]
+            },
+            {
+                "incomingTuples": 16384,
+                "operators": [
+                    {
+                        "id": 12,
+                        "inputs": [],
+                        "label": "PhysicalOperator(NES::ScanPhysicalOperator)",
+                        "outputs": [
+                            5
+                        ]
+                    },
+                    {
+                        "id": 5,
+                        "inputs": [
+                            12
+                        ],
+                        "label": "PhysicalOperator(NES::EventTimeWatermarkAssignerPhysicalOperator)",
+                        "outputs": [
+                            3
+                        ]
+                    },
+                    {
+                        "id": 3,
+                        "inputs": [
+                            5
+                        ],
+                        "label": "PhysicalOperator(NES::AggregationBuildPhysicalOperator)",
+                        "outputs": []
+                    }
+                ],
+                "pipelineId": 4,
+                "predecessors": [
+                    3
+                ],
+                "successors": [
+                    5
+                ]
+            },
+            {
+                "incomingTuples": 4445700,
+                "operators": [
+                    {
+                        "id": 4,
+                        "inputs": [],
+                        "label": "PhysicalOperator(NES::AggregationProbePhysicalOperator)",
+                        "outputs": [
+                            2
+                        ]
+                    },
+                    {
+                        "id": 2,
+                        "inputs": [
+                            4
+                        ],
+                        "label": "PhysicalOperator(NES::SelectionPhysicalOperator)",
+                        "outputs": [
+                            13
+                        ]
+                    },
+                    {
+                        "id": 13,
+                        "inputs": [
+                            2
+                        ],
+                        "label": "PhysicalOperator(NES::EmitPhysicalOperator)",
+                        "outputs": []
+                    }
+                ],
+                "pipelineId": 5,
+                "predecessors": [
+                    4
+                ],
+                "successors": [
+                    6
+                ]
+            },
+            {
+                "incomingTuples": 70916,
+                "operators": [
+                    {
+                        "id": 1,
+                        "inputs": [],
+                        "label": "PhysicalOperator(NES::SinkPhysicalOperator)",
+                        "outputs": []
+                    }
+                ],
+                "pipelineId": 6,
+                "predecessors": [
+                    5
+                ],
+                "successors": []
+            }
+        ],
+        "time": 0.709035,
+        "tuplesPerSecond": 23107.462960220582
+    },
+    {
+        "bytesPerSecond": 854245.3862915033,
+        "query name": "ClusterMonitoring_1",
+        "serializedLogicalPlan": [
+            {
+                "id": 15,
+                "inputs": [],
+                "label": "SOURCE(lrb)",
+                "nodeType": "Source",
+                "outputs": [
+                    10
+                ]
+            },
+            {
+                "id": 10,
+                "inputs": [
+                    15
+                ],
+                "label": "MAP(lrb$positionDiv5280 = lrb$position / 5280)",
+                "nodeType": "Map",
+                "outputs": [
+                    11
+                ]
+            },
+            {
+                "id": 11,
+                "inputs": [
+                    10
+                ],
+                "label": "PROJECTION(schema: lrb$creationTS:UINT64 lrb$vehicle:INT16 lrb$highway:INT16 lrb$direction:INT16 lrb$positionDiv5280:INT32 lrb$speed:FLOAT32)",
+                "nodeType": "Projection",
+                "outputs": [
+                    12
+                ]
+            },
+            {
+                "id": 12,
+                "inputs": [
+                    11
+                ],
+                "label": "WATERMARK_ASSIGNER(Event time)",
+                "nodeType": "EventTimeWatermarkAssigner",
+                "outputs": [
+                    13
+                ]
+            },
+            {
+                "id": 13,
+                "inputs": [
+                    12
+                ],
+                "label": "SlidingWindow AGG(lrb$cntSpeed = Count(speed))",
+                "nodeType": "WindowedAggregation",
+                "outputs": [
+                    14
+                ]
+            },
+            {
+                "id": 14,
+                "inputs": [
+                    13
+                ],
+                "label": "SINK(CHECKSUM1)",
+                "nodeType": "Sink",
+                "outputs": []
+            }
+        ],
+        "serializedPipelinePlan": [
+            {
+                "incomingTuples": 0,
+                "operators": [
+                    {
+                        "id": 21,
+                        "inputs": [],
+                        "label": "PhysicalOperator(NES::SourcePhysicalOperator)",
+                        "outputs": []
+                    }
+                ],
+                "pipelineId": 8,
+                "predecessors": [],
+                "successors": [
+                    9
+                ]
+            },
+            {
+                "incomingTuples": 16384,
+                "operators": [
+                    {
+                        "id": 22,
+                        "inputs": [],
+                        "label": "PhysicalOperator(NES::ScanPhysicalOperator)",
+                        "outputs": [
+                            20
+                        ]
+                    },
+                    {
+                        "id": 20,
+                        "inputs": [
+                            22
+                        ],
+                        "label": "PhysicalOperator(NES::MapPhysicalOperator)",
+                        "outputs": [
+                            23
+                        ]
+                    },
+                    {
+                        "id": 23,
+                        "inputs": [
+                            20
+                        ],
+                        "label": "PhysicalOperator(NES::EmitPhysicalOperator)",
+                        "outputs": []
+                    }
+                ],
+                "pipelineId": 9,
+                "predecessors": [
+                    8
+                ],
+                "successors": [
+                    10
+                ]
+            },
+            {
+                "incomingTuples": 16384,
+                "operators": [
+                    {
+                        "id": 18,
+                        "inputs": [],
+                        "label": "PhysicalOperator(NES::ScanPhysicalOperator)",
+                        "outputs": [
+                            19
+                        ]
+                    },
+                    {
+                        "id": 19,
+                        "inputs": [
+                            18
+                        ],
+                        "label": "PhysicalOperator(NES::EmitPhysicalOperator)",
+                        "outputs": []
+                    }
+                ],
+                "pipelineId": 10,
+                "predecessors": [
+                    9
+                ],
+                "successors": [
+                    11
+                ]
+            },
+            {
+                "incomingTuples": 16384,
+                "operators": [
+                    {
+                        "id": 24,
+                        "inputs": [],
+                        "label": "PhysicalOperator(NES::ScanPhysicalOperator)",
+                        "outputs": [
+                            17
+                        ]
+                    },
+                    {
+                        "id": 17,
+                        "inputs": [
+                            24
+                        ],
+                        "label": "PhysicalOperator(NES::EventTimeWatermarkAssignerPhysicalOperator)",
+                        "outputs": [
+                            15
+                        ]
+                    },
+                    {
+                        "id": 15,
+                        "inputs": [
+                            17
+                        ],
+                        "label": "PhysicalOperator(NES::AggregationBuildPhysicalOperator)",
+                        "outputs": []
+                    }
+                ],
+                "pipelineId": 11,
+                "predecessors": [
+                    10
+                ],
+                "successors": [
+                    12
+                ]
+            },
+            {
+                "incomingTuples": 491520,
+                "operators": [
+                    {
+                        "id": 16,
+                        "inputs": [],
+                        "label": "PhysicalOperator(NES::AggregationProbePhysicalOperator)",
+                        "outputs": [
+                            25
+                        ]
+                    },
+                    {
+                        "id": 25,
+                        "inputs": [
+                            16
+                        ],
+                        "label": "PhysicalOperator(NES::EmitPhysicalOperator)",
+                        "outputs": []
+                    }
+                ],
+                "pipelineId": 12,
+                "predecessors": [
+                    11
+                ],
+                "successors": [
+                    13
+                ]
+            },
+            {
+                "incomingTuples": 491460,
+                "operators": [
+                    {
+                        "id": 14,
+                        "inputs": [],
+                        "label": "PhysicalOperator(NES::SinkPhysicalOperator)",
+                        "outputs": []
+                    }
+                ],
+                "pipelineId": 13,
+                "predecessors": [
+                    12
+                ],
+                "successors": []
+            }
+        ],
+        "time": 0.671423,
+        "tuplesPerSecond": 24401.904611548904
+    }
+]
