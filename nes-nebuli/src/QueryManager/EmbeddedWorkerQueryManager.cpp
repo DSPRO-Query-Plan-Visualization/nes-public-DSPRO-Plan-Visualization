@@ -27,9 +27,12 @@ EmbeddedWorkerQueryManager::EmbeddedWorkerQueryManager(const SingleNodeWorkerCon
 {
 }
 
-std::expected<QueryId, Exception> EmbeddedWorkerQueryManager::registerQuery(const LogicalPlan& plan, nlohmann::json*) noexcept
+std::expected<QueryId, Exception> EmbeddedWorkerQueryManager::registerQuery(
+    const LogicalPlan& plan,
+    nlohmann::json* pipelinePlanSerialization,
+    std::unordered_map<uint64_t, std::shared_ptr<std::atomic<uint64_t>>>* incomingTuplesMap) noexcept
 {
-    return worker.registerQuery(plan, nullptr);
+    return worker.registerQuery(plan, pipelinePlanSerialization, incomingTuplesMap);
 }
 
 std::expected<void, Exception> EmbeddedWorkerQueryManager::start(const QueryId queryId) noexcept

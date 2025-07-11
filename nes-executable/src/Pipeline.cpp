@@ -16,6 +16,7 @@
 #include <Pipeline.hpp>
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <iterator>
 #include <memory>
@@ -28,12 +29,16 @@
 #include <vector>
 #include <Identifiers/Identifiers.hpp>
 #include <Runtime/Execution/OperatorHandler.hpp>
+#include <Util/Common.hpp>
 #include <Util/ExecutionMode.hpp>
 #include <fmt/base.h>
 #include <fmt/format.h>
 #include <magic_enum/magic_enum.hpp>
+
 #include <ErrorHandling.hpp>
 #include <PhysicalOperator.hpp>
+#include <Pipeline.hpp>
+#include <SelectionPhysicalOperator.hpp>
 #include <SinkPhysicalOperator.hpp>
 #include <SourcePhysicalOperator.hpp>
 

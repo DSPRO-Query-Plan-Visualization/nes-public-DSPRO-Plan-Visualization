@@ -37,7 +37,10 @@ class QuerySubmitter
 {
 public:
     explicit QuerySubmitter(std::unique_ptr<QueryManager> queryManager);
-    std::expected<QueryId, Exception> registerQuery(const LogicalPlan& plan, nlohmann::json* pipelinePlanSerialization);
+    std::expected<QueryId, Exception> registerQuery(
+        const LogicalPlan& plan,
+        nlohmann::json* pipelinePlanSerialization,
+        std::unordered_map<uint64_t, std::shared_ptr<std::atomic<uint64_t>>>* incomingTuplesMap);
     void startQuery(QueryId query);
     void stopQuery(QueryId query);
     void unregisterQuery(QueryId query);

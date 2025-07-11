@@ -37,7 +37,11 @@
 #include <variant>
 #include <vector>
 
+#include <Operators/Sources/SourceDescriptorLogicalOperator.hpp>
 #include <QueryManager/EmbeddedWorkerQueryManager.hpp>
+#include <Util/Common.hpp>
+#include <Util/Logger/Logger.hpp>
+#include <Util/Strings.hpp>
 #include <fmt/base.h>
 #include <fmt/color.h>
 #include <fmt/format.h>
@@ -46,6 +50,7 @@
 #include <folly/MPMCQueue.h>
 #include <grpcpp/create_channel.h>
 #include <grpcpp/security/credentials.h>
+#include <gtest/gtest-matchers.h>
 #include <nlohmann/json.hpp>
 
 #include <Identifiers/Identifiers.hpp>
@@ -142,7 +147,7 @@ runQueries(const std::vector<SystestQuery>& queries, const uint64_t numConcurren
             if (nextQuery.planInfoOrException.has_value())
             {
                 /// Registration
-                if (auto reg = querySubmitter.registerQuery(nextQuery.planInfoOrException.value().queryPlan, nullptr))
+                if (auto reg = querySubmitter.registerQuery(nextQuery.planInfoOrException.value().queryPlan, nullptr, nullptr))
                 {
                     hasOneMoreQueryToStart = true;
                     querySubmitter.startQuery(*reg);
@@ -277,6 +282,44 @@ void serializeQueryToJson(LogicalPlan plan, nlohmann::json& resultJson)
     }
 }
 
+/// Adds the "incomingTuples" field to every pipeline in resultJson, which contains the number of incoming tuples for each pipeline
+/// The source pipelines get a placeholder value 0, since their incoming tuple value is not relevant for visualization
+/// For each intermediate pipeline, the number of incoming tuples is contained in the respective atomic counter in the incomingTuplesMap. We access it via the pipeline id
+/// For the sink pipeline, the number of incoming tuples is contained in finalTupleCount
+void addIncomingTuplesToPipelinePlan(
+    nlohmann::json& resultJson,
+    std::unordered_map<uint64_t, std::shared_ptr<std::atomic<uint64_t>>> incomingTuplesMap,
+    uint64_t finalTupleCount)
+{
+    for (nlohmann::json& pipeline : resultJson)
+    {
+        /// We have 3 options for a pipeline: Either it's a source pipeline (predeccessors are empty), its the sink (successors are empty) are it's an intermediate pipeline
+        if (pipeline["predecessors"].empty())
+        {
+            /// The source pipeline gets a placeholder value as incoming tuples, since there is no incoming edge to it in the graph
+            pipeline["incomingTuples"] = 0;
+        }
+        else if (pipeline["successors"].empty())
+        {
+            /// This is our sink. FinalTupleCount contains it's incoming tuple value
+            pipeline["incomingTuples"] = finalTupleCount;
+        }
+        else
+        {
+            /// Intermediate pipeline. The numbers of incoming tuples should be in the map
+            if (uint64_t pipelineId = pipeline["pipelineId"]; incomingTuplesMap.contains(pipelineId))
+            {
+                uint64_t incomingTuples = incomingTuplesMap[pipelineId]->load(std::memory_order_relaxed);
+                pipeline["incomingTuples"] = incomingTuples;
+            }
+            else
+            {
+                NES_ERROR("Could not find incoming tuples for pipeline {}", pipelineId);
+            }
+        }
+    }
+}
+
 /// Serializes the query results in the resultJson object
 /// Captures runtime and bytes per ms
 /// Optionally captures json serializations of logical and pipeline query plan to visualize on the Conbench server
@@ -342,26 +385,17 @@ std::vector<RunningQuery> runQueriesAndBenchmark(
             fmt::println("skip failing query: {}", queryToRun.testName);
             continue;
         }
-
         auto pipelinePlanJson = nlohmann::json();
-        /// Pass the pipelineJson as raw pointer into the function, if we want to visualise our queries
-        /// Otherwise pass nullptr
-        /// This is currently a hotfix for not being able to set std::optional<class&> as arguments
+        /// In this map, we store pointers to the incoming tuple counters for each intermediate pipeline stage
+        /// After the query finished running, we can obtain the incoming tuples per pipeline for additional benchmarking data
+        std::unordered_map<uint64_t, std::shared_ptr<std::atomic<uint64_t>>> incomingTuplesMap;
+
+        /// Pass the pipelineJson and the incoming tuples map into the register query function, if we want to visualize the query plan on Conbench
+        /// Otherwise pass 2 nullptrs
+        /// Passing raw pointers to the json and the map is a hotfix for not being able to set std::optional<class&> as arguments
         const auto registrationResult = visualizePlans
-            ? submitter.registerQuery(queryToRun.planInfoOrException.value().queryPlan, &pipelinePlanJson)
-            : submitter.registerQuery(queryToRun.planInfoOrException.value().queryPlan, nullptr);
-
-        if (not registrationResult.has_value())
-        {
-            fmt::println("skip failing query: {}", queryToRun.testName);
-            continue;
-        }
-
-        /// Emplace potentially filled pipelinePlanJson in the vector of all the jsons
-        if (visualizePlans)
-        {
-            pipelinePlanSerializations.emplace_back(pipelinePlanJson);
-        }
+            ? submitter.registerQuery(queryToRun.planInfoOrException.value().queryPlan, &pipelinePlanJson, &incomingTuplesMap)
+            : submitter.registerQuery(queryToRun.planInfoOrException.value().queryPlan, nullptr, nullptr);
 
         auto queryId = registrationResult.value();
 
@@ -377,6 +411,29 @@ std::vector<RunningQuery> runQueriesAndBenchmark(
             continue;
         }
         runningQueryPtr->querySummary = summary;
+
+        /// Add incoming tuples as attribute for intermediate and sink pipeline and emplace filled pipelinePlanJson in the vector of all the jsons
+        if (visualizePlans)
+        {
+            /// Since the number of incoming tuples for the sink pipeline has not been accumulated yet, we still need to get them
+            /// We can get this number by checking the first value of the checksum sink
+            /// The assumption here is, that the query uses the CHECKSUM sink, which has the numbers of received tuples as first field
+            std::optional<std::vector<std::string>> queryResult = loadResult(queryToRun);
+            if (not queryResult)
+            {
+                NES_ERROR("Could not load query result.");
+            }
+            const std::string result = queryResult.value()[0];
+            /// Get the arrived tuples by parsing the string to the first komma
+            std::stringstream ss(result);
+            std::string tupleCountAsString;
+            std::getline(ss, tupleCountAsString, ',');
+            uint64_t finalTupleCount = std::stoull(tupleCountAsString);
+
+            /// Enrich pipeline plan json with incoming tuples for every pipeline
+            addIncomingTuplesToPipelinePlan(pipelinePlanJson, incomingTuplesMap, finalTupleCount);
+            pipelinePlanSerializations.push_back(pipelinePlanJson);
+        }
 
         /// Getting the size and no. tuples of all input files to pass this information to currentRunningQuery.bytesProcessed
         size_t bytesProcessed = 0;

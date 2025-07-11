@@ -48,8 +48,9 @@ SingleNodeWorker::SingleNodeWorker(SingleNodeWorker&& other) noexcept = default;
 SingleNodeWorker& SingleNodeWorker::operator=(SingleNodeWorker&& other) noexcept = default;
 
 SingleNodeWorker::SingleNodeWorker(const SingleNodeWorkerConfiguration& configuration)
-    : listener(std::make_shared<PrintingStatisticListener>(
-          fmt::format("EngineStats_{:%Y-%m-%d_%H-%M-%S}_{:d}.stats", std::chrono::system_clock::now(), ::getpid())))
+    : listener(
+          std::make_shared<PrintingStatisticListener>(
+              fmt::format("EngineStats_{:%Y-%m-%d_%H-%M-%S}_{:d}.stats", std::chrono::system_clock::now(), ::getpid())))
     , nodeEngine(NodeEngineBuilder(configuration.workerConfiguration, Util::copyPtr(listener), Util::copyPtr(listener)).build())
     , optimizer(std::make_unique<QueryOptimizer>(configuration.workerConfiguration.defaultQueryExecution))
     , compiler(std::make_unique<QueryCompilation::QueryCompiler>())
@@ -69,7 +70,10 @@ SingleNodeWorker::SingleNodeWorker(const SingleNodeWorkerConfiguration& configur
 /// We might want to move this to the engine.
 static std::atomic queryIdCounter = INITIAL<QueryId>.getRawValue();
 
-std::expected<QueryId, Exception> SingleNodeWorker::registerQuery(LogicalPlan plan, nlohmann::json* pipelinePlanSerialization) noexcept
+std::expected<QueryId, Exception> SingleNodeWorker::registerQuery(
+    LogicalPlan plan,
+    nlohmann::json* pipelinePlanSerialization,
+    std::unordered_map<uint64_t, std::shared_ptr<std::atomic<uint64_t>>>* incomingTuplesMap) noexcept
 {
     try
     {
@@ -79,6 +83,12 @@ std::expected<QueryId, Exception> SingleNodeWorker::registerQuery(LogicalPlan pl
         auto request = std::make_unique<QueryCompilation::QueryCompilationRequest>(queryPlan);
         request->dumpCompilationResult = configuration.workerConfiguration.dumpQueryCompilationIntermediateRepresentations.getValue();
         auto result = compiler->compileQuery(std::move(request), pipelinePlanSerialization);
+
+        /// Check if a pointer to the incomingTuplesMap was given. If yes, add the incoming tuples pointer for each intermediate executable pipeline to the map
+        if (incomingTuplesMap)
+        {
+            result->getPassingTuplesMap(incomingTuplesMap);
+        }
         return nodeEngine->registerCompiledQueryPlan(std::move(result));
     }
     catch (...)

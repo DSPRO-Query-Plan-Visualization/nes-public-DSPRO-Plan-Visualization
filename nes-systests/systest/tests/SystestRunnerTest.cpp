@@ -98,7 +98,11 @@ public:
 class MockQueryManager final : public QueryManager
 {
 public:
-    MOCK_METHOD((std::expected<QueryId, Exception>), registerQuery, (const LogicalPlan&, nlohmann::json*), (override));
+    MOCK_METHOD(
+        (std::expected<QueryId, Exception>),
+        registerQuery,
+        (const LogicalPlan&, nlohmann::json*, (std::unordered_map<uint64_t, std::shared_ptr<std::atomic<uint64_t>>>*)),
+        (override));
     MOCK_METHOD((std::expected<void, Exception>), start, (QueryId), (noexcept, override));
     MOCK_METHOD((std::expected<void, Exception>), stop, (QueryId), (noexcept, override));
     MOCK_METHOD((std::expected<void, Exception>), unregister, (QueryId), (noexcept, override));
@@ -125,7 +129,7 @@ TEST_F(SystestRunnerTest, RuntimeFailureWithUnexpectedCode)
     const auto runtimeErr = std::make_shared<Exception>(Exception{"runtime boom", 10000});
 
     auto mockManager = std::make_unique<MockQueryManager>();
-    EXPECT_CALL(*mockManager, registerQuery(::testing::_, ::testing::_)).WillOnce(testing::Return(std::expected<QueryId, Exception>{id}));
+    EXPECT_CALL(*mockManager, registerQuery(::testing::_, ::testing::_, ::testing::_)).WillOnce(testing::Return(std::expected<QueryId, Exception>{id}));
     EXPECT_CALL(*mockManager, start(id));
     EXPECT_CALL(*mockManager, status(id))
         .WillOnce(testing::Return(makeSummary(id, QueryStatus::Failed, runtimeErr)))
@@ -155,7 +159,7 @@ TEST_F(SystestRunnerTest, MissingExpectedRuntimeError)
     constexpr QueryId id{11};
 
     auto mockManager = std::make_unique<MockQueryManager>();
-    EXPECT_CALL(*mockManager, registerQuery(::testing::_, ::testing::_)).WillOnce(testing::Return(std::expected<QueryId, Exception>{id}));
+    EXPECT_CALL(*mockManager, registerQuery(::testing::_, ::testing::_, ::testing::_)).WillOnce(testing::Return(std::expected<QueryId, Exception>{id}));
     EXPECT_CALL(*mockManager, start(id));
     EXPECT_CALL(*mockManager, status(id))
         .WillOnce(testing::Return(makeSummary(id, QueryStatus::Stopped, nullptr)))

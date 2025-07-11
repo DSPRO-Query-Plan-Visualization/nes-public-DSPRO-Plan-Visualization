@@ -23,68 +23,74 @@
 #include <Runtime/Execution/QueryStatus.hpp>
 #include <Runtime/NodeEngine.hpp>
 #include <Runtime/QueryTerminationType.hpp>
+<<<<<<< HEAD
 #include <Util/Pointers.hpp>
 #include <ErrorHandling.hpp>
+    =======
+>>>>>>> b815438664 (chore(count-incoming-tuples-per-pipeline): Added atomic incoming tuples counter to CompiledExecutablePipelineStage.)
 #include <nlohmann/json.hpp>
 #include <nlohmann/json_fwd.hpp>
+#include <ErrorHandling.hpp>
 #include <QueryCompiler.hpp>
 #include <QueryOptimizer.hpp>
 #include <SingleNodeWorkerConfiguration.hpp>
 
-namespace NES
+    namespace NES
 {
-struct PrintingStatisticListener;
+    struct PrintingStatisticListener;
 
-/// @brief The SingleNodeWorker is a compiling StreamProcessingEngine, working alone on local sources and sinks, without external
-/// coordination. The SingleNodeWorker can register LogicalQueryPlans which are lowered into an executable format, by the
-/// QueryCompiler. The user can manage the lifecycle of queries inside the NodeEngine using the SingleNodeWorkers interface.
-/// The Class itself is NonCopyable, but Movable, it owns the QueryCompiler and the NodeEngine.
-class SingleNodeWorker
-{
-    SharedPtr<PrintingStatisticListener> listener;
-    SharedPtr<NodeEngine> nodeEngine;
-    UniquePtr<QueryOptimizer> optimizer;
-    UniquePtr<QueryCompilation::QueryCompiler> compiler;
-    SingleNodeWorkerConfiguration configuration;
+    /// @brief The SingleNodeWorker is a compiling StreamProcessingEngine, working alone on local sources and sinks, without external
+    /// coordination. The SingleNodeWorker can register LogicalQueryPlans which are lowered into an executable format, by the
+    /// QueryCompiler. The user can manage the lifecycle of queries inside the NodeEngine using the SingleNodeWorkers interface.
+    /// The Class itself is NonCopyable, but Movable, it owns the QueryCompiler and the NodeEngine.
+    class SingleNodeWorker
+    {
+        SharedPtr<PrintingStatisticListener> listener;
+        SharedPtr<NodeEngine> nodeEngine;
+        UniquePtr<QueryOptimizer> optimizer;
+        UniquePtr<QueryCompilation::QueryCompiler> compiler;
+        SingleNodeWorkerConfiguration configuration;
 
-public:
-    explicit SingleNodeWorker(const SingleNodeWorkerConfiguration&);
-    ~SingleNodeWorker();
-    /// Non-Copyable
-    SingleNodeWorker(const SingleNodeWorker& other) = delete;
-    SingleNodeWorker& operator=(const SingleNodeWorker& other) = delete;
+    public:
+        explicit SingleNodeWorker(const SingleNodeWorkerConfiguration&);
+        ~SingleNodeWorker();
+        /// Non-Copyable
+        SingleNodeWorker(const SingleNodeWorker& other) = delete;
+        SingleNodeWorker& operator=(const SingleNodeWorker& other) = delete;
 
-    /// Movable
-    SingleNodeWorker(SingleNodeWorker&& other) noexcept;
-    SingleNodeWorker& operator=(SingleNodeWorker&& other) noexcept;
+        /// Movable
+        SingleNodeWorker(SingleNodeWorker&& other) noexcept;
+        SingleNodeWorker& operator=(SingleNodeWorker&& other) noexcept;
 
-    /// Registers a DecomposedQueryPlan which internally triggers the QueryCompiler and registers the executable query plan. Once
-    /// returned the query can be started with the QueryId. The registered Query will be in the StoppedState
-    /// @param plan Fully Specified LogicalQueryPlan.
-    /// @param pipelinePlanJson Pointer to empty json. If the argument is not a nullptr, this json will be filled with the serialization of the pipeline query plan.
-    /// It is necessary that the registerQuery function obtains this argument because it is the only function which generates the pipeline plan.
-    /// After the function, the plan will already be lowered to compiled query plan.
-    /// @return QueryId which identifies the registered Query
-    [[nodiscard]] std::expected<QueryId, Exception> registerQuery(LogicalPlan plan, nlohmann::json* pipelinePlanSerialization) noexcept;
+        /// Registers a DecomposedQueryPlan which internally triggers the QueryCompiler and registers the executable query plan. Once
+        /// returned the query can be started with the QueryId. The registered Query will be in the StoppedState
+        /// @param plan Fully Specified LogicalQueryPlan.
+        /// @param pipelinePlanSerialization Pointer to empty json. If the argument is not a nullptr, this json will be filled with the serialization of the pipeline query plan. It is necessary that the registerQuery function obtains this argument because it is the only function which generates the pipeline plan. After the function, the plan will already be lowered to compiled query plan.
+        /// @param incomingTuplesMap pointer to empty unordered map, which should be filled with shared pointers to each intermediate pipelines incomingTuples atomic counter, if the pointer is not null.
+        /// @return QueryId which identifies the registered Query
+        [[nodiscard]] std::expected<QueryId, Exception> registerQuery(
+            LogicalPlan plan,
+            nlohmann::json* pipelinePlanSerialization,
+            std::unordered_map<uint64_t, std::shared_ptr<std::atomic<uint64_t>>>* incomingTuplesMap) noexcept;
 
-    /// Starts the Query asynchronously and moves it into the RunningState. Query execution error are only reported during runtime
-    /// of the query.
-    /// @param queryId identifies the registered query
-    std::expected<void, Exception> startQuery(QueryId queryId) noexcept;
+        /// Starts the Query asynchronously and moves it into the RunningState. Query execution error are only reported during runtime
+        /// of the query.
+        /// @param queryId identifies the registered query
+        std::expected<void, Exception> startQuery(QueryId queryId) noexcept;
 
-    /// Stops the Query and moves it into the StoppedState. The exact semantics and guarantees depend on the chosen
-    ///  QueryTerminationType
-    /// @param queryId identifies the registered query
-    /// @param terminationType dictates what happens with in in-flight data
-    std::expected<void, Exception> stopQuery(QueryId queryId, QueryTerminationType terminationType) noexcept;
+        /// Stops the Query and moves it into the StoppedState. The exact semantics and guarantees depend on the chosen
+        ///  QueryTerminationType
+        /// @param queryId identifies the registered query
+        /// @param terminationType dictates what happens with in in-flight data
+        std::expected<void, Exception> stopQuery(QueryId queryId, QueryTerminationType terminationType) noexcept;
 
-    /// Unregisters a stopped Query.
-    /// @param queryId identifies the registered stopped query
-    std::expected<void, Exception> unregisterQuery(QueryId queryId) noexcept;
+        /// Unregisters a stopped Query.
+        /// @param queryId identifies the registered stopped query
+        std::expected<void, Exception> unregisterQuery(QueryId queryId) noexcept;
 
-    /// Complete history of query status changes.
-    [[nodiscard]] std::optional<QueryLog::Log> getQueryLog(QueryId queryId) const;
-    /// Summary structure for query.
-    [[nodiscard]] std::expected<QuerySummary, Exception> getQuerySummary(QueryId queryId) const noexcept;
-};
+        /// Complete history of query status changes.
+        [[nodiscard]] std::optional<QueryLog::Log> getQueryLog(QueryId queryId) const;
+        /// Summary structure for query.
+        [[nodiscard]] std::expected<QuerySummary, Exception> getQuerySummary(QueryId queryId) const noexcept;
+    };
 }

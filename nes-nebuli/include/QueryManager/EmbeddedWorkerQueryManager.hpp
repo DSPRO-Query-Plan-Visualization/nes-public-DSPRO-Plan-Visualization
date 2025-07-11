@@ -27,7 +27,10 @@ class EmbeddedWorkerQueryManager final : public QueryManager
 {
 public:
     explicit EmbeddedWorkerQueryManager(const SingleNodeWorkerConfiguration& configuration);
-    [[nodiscard]] std::expected<QueryId, Exception> registerQuery(const LogicalPlan& plan, nlohmann::json*) noexcept override;
+    [[nodiscard]] std::expected<QueryId, Exception> registerQuery(
+        const LogicalPlan& plan,
+        nlohmann::json* pipelinePlanSerialization,
+        std::unordered_map<uint64_t, std::shared_ptr<std::atomic<uint64_t>>>* incomingTuplesMap) noexcept override;
     std::expected<void, Exception> start(QueryId queryId) noexcept override;
     std::expected<void, Exception> stop(QueryId queryId) noexcept override;
     std::expected<void, Exception> unregister(QueryId queryId) noexcept override;

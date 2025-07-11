@@ -32,6 +32,9 @@
 namespace NES::Systest
 {
 
+/// Returns all result fields of a query as string vector, if query results can be found
+std::optional<std::vector<std::string>> loadResult(const NES::Systest::SystestQuery& query);
+
 /// Returns an error message or an empty optional if the query result is correct
 std::optional<std::string> checkResult(const RunningQuery& runningQuery);
 

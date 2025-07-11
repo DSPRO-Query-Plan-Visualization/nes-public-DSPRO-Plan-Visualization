@@ -20,10 +20,12 @@
 #include <Identifiers/Identifiers.hpp>
 #include <Sinks/SinkDescriptor.hpp>
 #include <Sources/SourceDescriptor.hpp>
+#include <Util/Common.hpp>
 #include <ExecutablePipelineStage.hpp>
 
 namespace NES
 {
+class CompiledExecutablePipelineStage;
 
 struct ExecutablePipeline
 {
@@ -61,6 +63,20 @@ struct CompiledQueryPlan
 {
     static std::unique_ptr<CompiledQueryPlan> create(
         QueryId queryId, std::vector<std::shared_ptr<ExecutablePipeline>> pipelines, std::vector<Sink> sinks, std::vector<Source> sources);
+
+    /// Fills up a map with shared pointers to the atomic incomingTuples counters of all CompiledExecutablePipelineStages of this plan
+    /// This information is needed to display the query plan as graph on Conbench
+    void getPassingTuplesMap(std::unordered_map<uint64_t, std::shared_ptr<std::atomic<uint64_t>>>* stageMap) const
+    {
+        for (const auto& pipeline : pipelines)
+        {
+            uint64_t id = pipeline->id.getRawValue();
+            if (NES::Util::instanceOf<CompiledExecutablePipelineStage>(pipeline->stage))
+            {
+                (*stageMap)[id] = pipeline->stage->getIncomingTuples();
+            }
+        }
+    }
 
     QueryId queryId;
     std::vector<std::shared_ptr<ExecutablePipeline>> pipelines;

@@ -34,7 +34,8 @@ class GRPCQueryManager final : public QueryManager
 
 public:
     explicit GRPCQueryManager(const std::shared_ptr<grpc::Channel>& channel);
-    std::expected<QueryId, Exception> registerQuery(const LogicalPlan& plan, nlohmann::json*) noexcept override;
+    std::expected<QueryId, Exception> registerQuery(
+        const LogicalPlan& plan, nlohmann::json*, std::unordered_map<uint64_t, std::shared_ptr<std::atomic<uint64_t>>>*) noexcept override;
     std::expected<void, Exception> stop(QueryId queryId) noexcept override;
     std::expected<void, Exception> start(QueryId queryId) noexcept override;
     std::expected<void, Exception> unregister(QueryId queryId) noexcept override;

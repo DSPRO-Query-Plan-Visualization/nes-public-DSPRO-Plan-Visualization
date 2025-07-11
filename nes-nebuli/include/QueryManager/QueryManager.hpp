@@ -37,8 +37,11 @@ class QueryManager
 {
 public:
     virtual ~QueryManager() = default;
-    [[nodiscard]] virtual std::expected<QueryId, Exception>
-    registerQuery(const LogicalPlan& plan, nlohmann::json* pipelinePlanSerialization) = 0;
+    [[nodiscard]] virtual std::expected<QueryId, Exception> registerQuery(
+        const LogicalPlan& plan,
+        nlohmann::json* pipelinePlanSerialization,
+        std::unordered_map<uint64_t, std::shared_ptr<std::atomic<uint64_t>>>* incomingTuplesMap)
+        = 0;
     virtual std::expected<void, Exception> start(QueryId queryId) noexcept = 0;
     virtual std::expected<void, Exception> stop(QueryId queryId) noexcept = 0;
     virtual std::expected<void, Exception> unregister(QueryId queryId) noexcept = 0;

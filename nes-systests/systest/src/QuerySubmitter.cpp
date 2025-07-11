@@ -36,14 +36,17 @@ QuerySubmitter::QuerySubmitter(std::unique_ptr<QueryManager> queryManager) : que
 {
 }
 
-std::expected<QueryId, Exception> QuerySubmitter::registerQuery(const LogicalPlan& plan, nlohmann::json* pipelinePlanSerialization)
+std::expected<QueryId, Exception> QuerySubmitter::registerQuery(
+    const LogicalPlan& plan,
+    nlohmann::json* pipelinePlanSerialization,
+    std::unordered_map<uint64_t, std::shared_ptr<std::atomic<uint64_t>>>* incomingTuplesMap)
 {
     /// Make sure the queryplan is passed through serialization logic.
     const auto serialized = QueryPlanSerializationUtil::serializeQueryPlan(plan);
     const auto deserialized = QueryPlanSerializationUtil::deserializeQueryPlan(serialized);
     if (deserialized == plan)
     {
-        return queryManager->registerQuery(deserialized, pipelinePlanSerialization);
+        return queryManager->registerQuery(deserialized, pipelinePlanSerialization, incomingTuplesMap);
     }
     const auto exception = CannotSerialize(
         "Query plan serialization is wrong: plan != deserialize(serialize(plan)), with plan:\n{} and deserialize(serialize(plan)):\n{}",
