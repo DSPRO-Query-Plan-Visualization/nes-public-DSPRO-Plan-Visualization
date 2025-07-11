@@ -29,6 +29,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <Operators/Sinks/SinkLogicalOperator.hpp>
 #include <Operators/Sources/SourceDescriptorLogicalOperator.hpp>
 #include <Util/Common.hpp>
 #include <Util/Logger/Logger.hpp>
@@ -507,6 +508,10 @@ void serializeQueryToJson(LogicalPlan plan, nlohmann::json& resultJson)
     {
         std::string op_string;
         absl::Status status = google::protobuf::util::MessageToJsonString(serializedOp, &op_string, options);
+        if (!status.ok())
+        {
+            NES_ERROR("Error while trying to obtain json string of logical plan for query {}", plan.getQueryId());
+        }
         const nlohmann::json opJson = nlohmann::json::parse(op_string);
         resultJson.push_back(opJson);
     }
@@ -652,14 +657,34 @@ std::vector<RunningQuery> runQueriesAndBenchmark(
         if (visualizePlans)
         {
             /// Since the number of incoming tuples for the sink pipeline has not been accumulated yet, we still need to get them
-            /// We can get this number by checking the first value of the checksum sink
-            /// The assumption here is, that the query uses the CHECKSUM sink, which has the numbers of received tuples as first field
-            std::string result = loadQueryResult(queryToRun)->result[0];
-            /// Get the arrived tuples by parsing the string to the first komma
-            std::stringstream ss(result);
-            std::string tupleCountAsString;
-            std::getline(ss, tupleCountAsString, ',');
-            uint64_t finalTupleCount = std::stoull(tupleCountAsString);
+            /// We can get this number by either checking the first field of the checksum sink or counting the results of any other sink
+            std::regex checksumPattern(R"(CHECKSUM\d*)");
+            LogicalOperator rootOp = queryToRun.queryPlan.rootOperators[0];
+            auto sinkOp = rootOp.tryGet<SinkLogicalOperator>();
+            if (!sinkOp)
+            {
+                NES_ERROR("Root operator of the logical plan should always be a sink.")
+            }
+            std::string sinkName = sinkOp.value().sinkName;
+            std::cout << sinkName << std::endl;
+            uint64_t finalTupleCount = 0;
+            std::vector<std::string> results = loadQueryResult(queryToRun)->result;
+
+            if (std::regex_match(sinkName, checksumPattern))
+            {
+                /// The sink is a checksum sink, we need to read the first field of the first result to obtain the number of arrived tuples
+                const std::string result = results[0];
+                /// Get the arrived tuples by parsing the string to the first komma
+                std::stringstream ss(result);
+                std::string tupleCountAsString;
+                std::getline(ss, tupleCountAsString, ',');
+                finalTupleCount = std::stoull(tupleCountAsString);
+            }
+            else
+            {
+                /// A normal sink, we count the number of arrived tuples by looking at the size of teh result vector
+                finalTupleCount = results.size();
+            }
 
             /// Enrich pipeline plan json with incoming tuples for every pipeline
             addIncomingTuplesToPipelinePlan(pipelinePlanJson, incomingTuplesMap, finalTupleCount);
