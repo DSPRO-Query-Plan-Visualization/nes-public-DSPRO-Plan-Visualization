@@ -37,6 +37,7 @@
 #include <variant>
 #include <vector>
 
+#include <Operators/Sinks/SinkLogicalOperator.hpp>
 #include <Operators/Sources/SourceDescriptorLogicalOperator.hpp>
 #include <QueryManager/EmbeddedWorkerQueryManager.hpp>
 #include <Util/Common.hpp>
@@ -277,6 +278,10 @@ void serializeQueryToJson(LogicalPlan plan, nlohmann::json& resultJson)
     {
         std::string op_string;
         absl::Status status = google::protobuf::util::MessageToJsonString(serializedOp, &op_string, options);
+        if (!status.ok())
+        {
+            NES_ERROR("Error while trying to obtain json string of logical plan for query {}", plan.getQueryId());
+        }
         const nlohmann::json opJson = nlohmann::json::parse(op_string);
         resultJson.push_back(opJson);
     }
@@ -415,24 +420,52 @@ std::vector<RunningQuery> runQueriesAndBenchmark(
         /// Add incoming tuples as attribute for intermediate and sink pipeline and emplace filled pipelinePlanJson in the vector of all the jsons
         if (visualizePlans)
         {
-            /// Since the number of incoming tuples for the sink pipeline has not been accumulated yet, we still need to get them
-            /// We can get this number by checking the first value of the checksum sink
-            /// The assumption here is, that the query uses the CHECKSUM sink, which has the numbers of received tuples as first field
-            std::optional<std::vector<std::string>> queryResult = loadResult(queryToRun);
-            if (not queryResult)
-            {
-                NES_ERROR("Could not load query result.");
-            }
-            const std::string result = queryResult.value()[0];
-            /// Get the arrived tuples by parsing the string to the first komma
-            std::stringstream ss(result);
-            std::string tupleCountAsString;
-            std::getline(ss, tupleCountAsString, ',');
-            uint64_t finalTupleCount = std::stoull(tupleCountAsString);
+            /// Since the number of incoming tuples for the sink pipeline has not been accumulated yet, we still need to get them.
+            /// We can get this number by either checking the first field of the checksum sink or counting the results of any other sink
+            std::regex checksumPattern(R"(CHECKSUM\d*)");
+            std::expected<SystestQuery::PlanInfo, Exception> planInfo = queryToRun.planInfoOrException;
 
-            /// Enrich pipeline plan json with incoming tuples for every pipeline
-            addIncomingTuplesToPipelinePlan(pipelinePlanJson, incomingTuplesMap, finalTupleCount);
-            pipelinePlanSerializations.push_back(pipelinePlanJson);
+            /// Only if the logical plan can be accessed, we may continue. Otherwise, the pipeline plan won't be integrated in the BenchmarkResult json anyway.
+            if (planInfo)
+            {
+                const auto logicalPlan = planInfo.value().queryPlan;
+                LogicalOperator rootOp = logicalPlan.getRootOperators()[0];
+                auto sinkOp = rootOp.tryGet<SinkLogicalOperator>();
+                if (!sinkOp)
+                {
+                    NES_ERROR("Root operator of the logical plan should always be a sink.")
+                }
+                std::string sinkName = sinkOp.value().getSinkName();
+                uint64_t finalTupleCount = 0;
+
+                std::optional<std::vector<std::string>> queryResult = loadResult(queryToRun);
+                if (not queryResult)
+                {
+                    NES_ERROR("Could not load query result.");
+                }
+
+                std::vector<std::string> results = queryResult.value();
+
+                if (std::regex_match(sinkName, checksumPattern))
+                {
+                    /// The sink is a checksum sink, we need to read the first field of the first result to obtain the number of arrived tuples
+                    const std::string result = results[0];
+                    /// Get the arrived tuples by parsing the string to the first komma
+                    std::stringstream ss(result);
+                    std::string tupleCountAsString;
+                    std::getline(ss, tupleCountAsString, ',');
+                    finalTupleCount = std::stoull(tupleCountAsString);
+                }
+                else
+                {
+                    /// A normal sink, we count the number of arrived tuples by looking at the size of teh result vector
+                    finalTupleCount = results.size();
+                }
+
+                /// Enrich pipeline plan json with incoming tuples for every pipeline
+                addIncomingTuplesToPipelinePlan(pipelinePlanJson, incomingTuplesMap, finalTupleCount);
+                pipelinePlanSerializations.push_back(pipelinePlanJson);
+            }
         }
 
         /// Getting the size and no. tuples of all input files to pass this information to currentRunningQuery.bytesProcessed

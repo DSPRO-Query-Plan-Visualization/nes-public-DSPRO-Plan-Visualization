@@ -23,11 +23,8 @@
 #include <Runtime/Execution/QueryStatus.hpp>
 #include <Runtime/NodeEngine.hpp>
 #include <Runtime/QueryTerminationType.hpp>
-<<<<<<< HEAD
 #include <Util/Pointers.hpp>
 #include <ErrorHandling.hpp>
-    =======
->>>>>>> b815438664 (chore(count-incoming-tuples-per-pipeline): Added atomic incoming tuples counter to CompiledExecutablePipelineStage.)
 #include <nlohmann/json.hpp>
 #include <nlohmann/json_fwd.hpp>
 #include <ErrorHandling.hpp>

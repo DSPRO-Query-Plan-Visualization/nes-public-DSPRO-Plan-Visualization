@@ -52,7 +52,8 @@ std::string explainProjection(const ProjectionLogicalOperator::Projection& proje
 {
     std::stringstream builder;
     builder << projection.second.explain(verbosity);
-    if (projection.first)
+    /// For non-debug verbosity, we should really only write the field names twice, if it really adds information
+    if (projection.first && (verbosity == ExplainVerbosity::Debug || projection.first->getFieldName() != builder.str()))
     {
         builder << " as " << projection.first->getFieldName();
     }
@@ -116,11 +117,13 @@ std::string ProjectionLogicalOperator::explain(ExplainVerbosity verbosity) const
     {
         builder << "opId: " << id << ", ";
     }
+    /// Temporarly removed because way too verbose for a "simple" explain
+    /*
     if (!outputSchema.getFieldNames().empty())
     {
         builder << "schema: " << outputSchema << ", ";
     }
-
+    */
     builder << "fields: [";
     if (asterisk)
     {

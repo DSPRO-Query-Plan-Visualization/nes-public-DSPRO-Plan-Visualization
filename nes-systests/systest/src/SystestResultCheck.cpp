@@ -681,6 +681,16 @@ QueryCheckResult checkQuery(const NES::Systest::RunningQuery& runningQuery)
 namespace NES::Systest
 {
 
+std::optional<std::vector<std::string>> loadResult(const NES::Systest::SystestQuery& query)
+{
+    auto resultStruct = loadQueryResult(query);
+    if (resultStruct.has_value())
+    {
+        return resultStruct.value().result;
+    }
+        return std::nullopt;
+}
+
 std::optional<std::string> checkResult(const RunningQuery& runningQuery)
 {
     static constexpr std::string_view SchemaMismatchMessage = "\n\n"

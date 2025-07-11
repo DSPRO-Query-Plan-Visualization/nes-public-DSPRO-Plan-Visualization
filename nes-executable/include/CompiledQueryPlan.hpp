@@ -18,6 +18,7 @@
 #include <variant>
 #include <vector>
 #include <Identifiers/Identifiers.hpp>
+#include <Pipelines/CompiledExecutablePipelineStage.hpp>
 #include <Sinks/SinkDescriptor.hpp>
 #include <Sources/SourceDescriptor.hpp>
 #include <Util/Common.hpp>
@@ -25,7 +26,6 @@
 
 namespace NES
 {
-class CompiledExecutablePipelineStage;
 
 struct ExecutablePipeline
 {

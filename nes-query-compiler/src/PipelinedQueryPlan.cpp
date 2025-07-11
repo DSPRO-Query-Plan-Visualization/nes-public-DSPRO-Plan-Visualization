@@ -202,6 +202,10 @@ void PipelinedQueryPlan::serializeAsJson(nlohmann::json* resultJson) const
     {
         std::string pipeline_string;
         absl::Status status = google::protobuf::util::MessageToJsonString(serializedPipeline, &pipeline_string, options);
+        if (!status.ok())
+        {
+            NES_ERROR("Error while trying to obtain json string of pipeline plan for query {}", getQueryId());
+        }
         const nlohmann::json pipelineJson = nlohmann::json::parse(pipeline_string);
         resultJson->push_back(pipelineJson);
     }

@@ -74,7 +74,6 @@ class SystestAdapter(BenchmarkAdapter):
                     stats={
                         "data": [result["bytesPerSecond"]],
                         "unit": "B/s",
-                        "logicalPlanJson": [result["serializedLogicalPlan"]]
                     },
                     context={"benchmark_language": "systest"},
                     tags={"name": result["query name"] + " [B/s]"},

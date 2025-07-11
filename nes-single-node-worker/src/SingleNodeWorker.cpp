@@ -51,7 +51,7 @@ SingleNodeWorker::SingleNodeWorker(const SingleNodeWorkerConfiguration& configur
     : listener(
           std::make_shared<PrintingStatisticListener>(
               fmt::format("EngineStats_{:%Y-%m-%d_%H-%M-%S}_{:d}.stats", std::chrono::system_clock::now(), ::getpid())))
-    , nodeEngine(NodeEngineBuilder(configuration.workerConfiguration, Util::copyPtr(listener), Util::copyPtr(listener)).build())
+    , nodeEngine(NodeEngineBuilder(configuration.workerConfiguration, NES::Util::copyPtr(listener), NES::Util::copyPtr(listener)).build())
     , optimizer(std::make_unique<QueryOptimizer>(configuration.workerConfiguration.defaultQueryExecution))
     , compiler(std::make_unique<QueryCompilation::QueryCompiler>())
     , configuration(configuration)
