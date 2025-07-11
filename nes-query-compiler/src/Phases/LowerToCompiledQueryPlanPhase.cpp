@@ -42,7 +42,7 @@ namespace NES
 {
 
 LowerToCompiledQueryPlanPhase::Successor
-LowerToCompiledQueryPlanPhase::processSuccessor(const Predecessor& predecessor, const std::shared_ptr<Pipeline>& pipeline)
+LowerToCompiledQueryPlanPhase::processSuccessor(const Predecessor& predecessor, const std::shared_ptr<Pipeline>& pipeline, const bool countIncomingTuples)
 {
     PRECONDITION(pipeline->isSinkPipeline() || pipeline->isOperatorPipeline(), "expected a Sink or OperatorPipeline");
 
@@ -51,10 +51,10 @@ LowerToCompiledQueryPlanPhase::processSuccessor(const Predecessor& predecessor, 
         processSink(predecessor, pipeline);
         return {};
     }
-    return processOperatorPipeline(pipeline);
+    return processOperatorPipeline(pipeline, countIncomingTuples);
 }
 
-void LowerToCompiledQueryPlanPhase::processSource(const std::shared_ptr<Pipeline>& pipeline)
+void LowerToCompiledQueryPlanPhase::processSource(const std::shared_ptr<Pipeline>& pipeline, const bool countIncomingTuples)
 {
     PRECONDITION(pipeline->isSourcePipeline(), "expected a SourcePipeline {}", *pipeline);
 
@@ -72,7 +72,7 @@ void LowerToCompiledQueryPlanPhase::processSource(const std::shared_ptr<Pipeline
 
     for (const auto& successor : pipeline->getSuccessors())
     {
-        if (auto executableSuccessor = processSuccessor(executableInputFormatterPipeline, successor))
+        if (auto executableSuccessor = processSuccessor(executableInputFormatterPipeline, successor, countIncomingTuples))
         {
             executableInputFormatterPipeline->successors.emplace_back(*executableSuccessor);
         }
@@ -101,7 +101,7 @@ void LowerToCompiledQueryPlanPhase::processSink(const Predecessor& predecessor, 
     it->predecessor.emplace_back(predecessor);
 }
 
-std::unique_ptr<ExecutablePipelineStage> LowerToCompiledQueryPlanPhase::getStage(const std::shared_ptr<Pipeline>& pipeline)
+std::unique_ptr<ExecutablePipelineStage> LowerToCompiledQueryPlanPhase::getStage(const std::shared_ptr<Pipeline>& pipeline, const bool countIncomingTuples)
 {
     nautilus::engine::Options options;
     switch (pipelineQueryPlan->getExecutionMode())
@@ -142,21 +142,21 @@ std::unique_ptr<ExecutablePipelineStage> LowerToCompiledQueryPlanPhase::getStage
             options.setOption("dump.file", true);
             break;
     }
-    return std::make_unique<CompiledExecutablePipelineStage>(pipeline, pipeline->getOperatorHandlers(), options);
+    return std::make_unique<CompiledExecutablePipelineStage>(pipeline, pipeline->getOperatorHandlers(), options, countIncomingTuples);
 }
 
-std::shared_ptr<ExecutablePipeline> LowerToCompiledQueryPlanPhase::processOperatorPipeline(const std::shared_ptr<Pipeline>& pipeline)
+std::shared_ptr<ExecutablePipeline> LowerToCompiledQueryPlanPhase::processOperatorPipeline(const std::shared_ptr<Pipeline>& pipeline, const bool countIncomingTuples)
 {
     /// check if the particular pipeline already exist in the pipeline map.
     if (const auto executable = pipelineToExecutableMap.find(pipeline->getPipelineId()); executable != pipelineToExecutableMap.end())
     {
         return executable->second;
     }
-    auto executablePipeline = ExecutablePipeline::create(PipelineId(pipeline->getPipelineId()), getStage(pipeline), {});
+    auto executablePipeline = ExecutablePipeline::create(PipelineId(pipeline->getPipelineId()), getStage(pipeline, countIncomingTuples), {});
 
     for (const auto& successor : pipeline->getSuccessors())
     {
-        if (auto executableSuccessor = processSuccessor(executablePipeline, successor))
+        if (auto executableSuccessor = processSuccessor(executablePipeline, successor, countIncomingTuples))
         {
             executablePipeline->successors.emplace_back(*executableSuccessor);
         }
@@ -166,7 +166,7 @@ std::shared_ptr<ExecutablePipeline> LowerToCompiledQueryPlanPhase::processOperat
     return executablePipeline;
 }
 
-std::unique_ptr<CompiledQueryPlan> LowerToCompiledQueryPlanPhase::apply(const std::shared_ptr<PipelinedQueryPlan>& pipelineQueryPlan)
+std::unique_ptr<CompiledQueryPlan> LowerToCompiledQueryPlanPhase::apply(const std::shared_ptr<PipelinedQueryPlan>& pipelineQueryPlan, const bool countIncomingTuples)
 {
     this->pipelineQueryPlan = pipelineQueryPlan;
 
@@ -174,7 +174,7 @@ std::unique_ptr<CompiledQueryPlan> LowerToCompiledQueryPlanPhase::apply(const st
     auto sourcePipelines = pipelineQueryPlan->getSourcePipelines();
     for (const auto& pipeline : sourcePipelines)
     {
-        processSource(pipeline);
+        processSource(pipeline, countIncomingTuples);
     }
 
     auto pipelines = std::move(pipelineToExecutableMap) | std::views::values | std::ranges::to<std::vector>();

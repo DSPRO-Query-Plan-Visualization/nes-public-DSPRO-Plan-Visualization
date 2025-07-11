@@ -35,7 +35,8 @@ public:
     CompiledExecutablePipelineStage(
         std::shared_ptr<Pipeline> pipeline,
         std::unordered_map<OperatorHandlerId, std::shared_ptr<OperatorHandler>> operatorHandler,
-        nautilus::engine::Options options);
+        nautilus::engine::Options options,
+        bool countIncomingTuples);
     void start(PipelineExecutionContext& pipelineExecutionContext) override;
     void execute(const Memory::TupleBuffer& inputTupleBuffer, PipelineExecutionContext& pipelineExecutionContext) override;
     void stop(PipelineExecutionContext& pipelineExecutionContext) override;
@@ -52,8 +53,11 @@ private:
     std::unordered_map<OperatorHandlerId, std::shared_ptr<OperatorHandler>> operatorHandlers;
     std::shared_ptr<Pipeline> pipeline;
     /// Counts the incoming tuples for this pipeline in a thread safe manner
-    /// The counter is incremented by counting the number of tuples in the tuple buffer everytime, this stage is executed-
+    /// The counter is incremented by counting the number of tuples in the tuple buffer everytime, this stage is executed.
     std::shared_ptr<std::atomic<uint64_t>> incomingTuples = std::make_shared<std::atomic<uint64_t>>(0);
+    /// If set true during construction of the object, the incomingTuples counter keeps track of the incoming tuples in this stage's execute function.
+    /// Otherwise, incomingTuples is never touched.
+    const bool countIncomingTuples;
 };
 
 }

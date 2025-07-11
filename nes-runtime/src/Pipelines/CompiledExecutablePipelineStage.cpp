@@ -13,6 +13,8 @@
 */
 #include <Pipelines/CompiledExecutablePipelineStage.hpp>
 
+#include <atomic>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <ostream>
@@ -35,19 +37,24 @@ namespace NES
 CompiledExecutablePipelineStage::CompiledExecutablePipelineStage(
     std::shared_ptr<Pipeline> pipeline,
     std::unordered_map<OperatorHandlerId, std::shared_ptr<OperatorHandler>> operatorHandlers,
-    nautilus::engine::Options options)
+    nautilus::engine::Options options,
+    const bool countIncomingTuples)
     : options(std::move(options))
     , compiledPipelineFunction(nullptr)
     , operatorHandlers(std::move(operatorHandlers))
     , pipeline(std::move(pipeline))
+    , countIncomingTuples(countIncomingTuples)
 {
 }
 
 void CompiledExecutablePipelineStage::execute(
     const Memory::TupleBuffer& inputTupleBuffer, PipelineExecutionContext& pipelineExecutionContext)
 {
-    /// Increase the number of incoming tuples
-    incomingTuples->fetch_add(inputTupleBuffer.getNumberOfTuples(), std::memory_order_relaxed);
+    /// Increase the number of incoming tuples, if the operator should count them
+    if (countIncomingTuples)
+    {
+        incomingTuples->fetch_add(inputTupleBuffer.getNumberOfTuples(), std::memory_order_relaxed);
+    }
     /// we call the compiled pipeline function with an input buffer and the execution context
     pipelineExecutionContext.setOperatorHandlers(operatorHandlers);
     Arena arena(pipelineExecutionContext.getBufferManager());

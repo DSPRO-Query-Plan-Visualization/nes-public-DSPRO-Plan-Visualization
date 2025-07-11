@@ -31,18 +31,18 @@ public:
     {
     }
 
-    std::unique_ptr<CompiledQueryPlan> apply(const std::shared_ptr<PipelinedQueryPlan>& pipelineQueryPlan);
+    std::unique_ptr<CompiledQueryPlan> apply(const std::shared_ptr<PipelinedQueryPlan>& pipelineQueryPlan, const bool countIncomingTuples);
 
 private:
     using Predecessor = std::variant<OriginId, std::weak_ptr<ExecutablePipeline>>;
     using Successor = std::optional<std::shared_ptr<ExecutablePipeline>>;
 
-    std::shared_ptr<ExecutablePipeline> processOperatorPipeline(const std::shared_ptr<Pipeline>& pipeline);
+    std::shared_ptr<ExecutablePipeline> processOperatorPipeline(const std::shared_ptr<Pipeline>& pipeline, const bool countIncomingTuples);
     void processSink(const Predecessor& predecessor, const std::shared_ptr<Pipeline>& pipeline);
-    Successor processSuccessor(const Predecessor& predecessor, const std::shared_ptr<Pipeline>& pipeline);
-    void processSource(const std::shared_ptr<Pipeline>& pipeline);
+    Successor processSuccessor(const Predecessor& predecessor, const std::shared_ptr<Pipeline>& pipeline, const bool countIncomingTuples);
+    void processSource(const std::shared_ptr<Pipeline>& pipeline, const bool countIncomingTuples);
 
-    std::unique_ptr<ExecutablePipelineStage> getStage(const std::shared_ptr<Pipeline>& pipeline);
+    std::unique_ptr<ExecutablePipelineStage> getStage(const std::shared_ptr<Pipeline>& pipeline, const bool countIncomingTuples);
 
     /// Lowering context
     std::vector<Sink> sinks;
