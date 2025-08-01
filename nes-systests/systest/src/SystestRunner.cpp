@@ -301,8 +301,18 @@ void addIncomingTuplesToPipelinePlan(
         /// We have 3 options for a pipeline: Either it's a source pipeline (predeccessors are empty), its the sink (successors are empty) are it's an intermediate pipeline
         if (pipeline["predecessors"].empty())
         {
-            /// The source pipeline gets a placeholder value as incoming tuples, since there is no incoming edge to it in the graph
-            pipeline["incomingTuples"] = 0;
+            /// A source pipeline does not perform any tuple eliminating actions. Therefore, we can assume that the successor of the source pipeline
+            /// has the same amount of incoming tuples as the source itself.
+            /// Therefore, we either take the result for the successor id out of the map, our take the finalTupleCount if the successor is the sink pipeline
+            uint32_t successorId = pipeline["successors"].at(0);
+            if (incomingTuplesMap.contains(successorId))
+            {
+                pipeline["incomingTuples"] = incomingTuplesMap[successorId]->load(std::memory_order_relaxed);
+            }
+            else
+            {
+                pipeline["incomingTuples"] = finalTupleCount;
+            }
         }
         else if (pipeline["successors"].empty())
         {
