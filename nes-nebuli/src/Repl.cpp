@@ -319,7 +319,7 @@ bool Repl::executeQuery(const std::string& query)
         return false;
     }
 
-    auto queryIdExpected = grpcClient->registerQuery(optimizedPlan.value());
+    auto queryIdExpected = grpcClient->registerQuery(optimizedPlan.value(), nullptr, nullptr);
     if (not queryIdExpected.has_value())
     {
         std::cout << fmt::format("Failed to register query: {}\n", queryIdExpected.error().what());

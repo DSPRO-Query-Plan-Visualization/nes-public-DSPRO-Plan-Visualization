@@ -16,6 +16,11 @@
 A Script to either run all systests in benchmark mode or time the compile time of Nebulastream. The Results are then uploaded
 to conbench
 """
+"""
+This script is not the one you should use for the upload of query plans for visualization! For this, please use the
+benchmark.py script in the systest_mimic directory of the Conbench-Query-Plan-Visualization repository on our organization!
+The BenchmarkResults.json file, you want to send, must also be moved to this directory!
+"""
 import json
 import subprocess
 import time
@@ -59,42 +64,22 @@ class SystestAdapter(BenchmarkAdapter):
         benchmarkResults = []
 
         for result in raw_results:
-            if "serializedLogicalPlan" in result:
-                benchmarkResults.append(BenchmarkResult(
-                    stats={
-                        "data": [result["time"]],
-                        "unit": "ns",
-                        "logicalPlanJson": [result["serializedLogicalPlan"]],
-                        "pipelinePlanJson": [result["serializedPipelinePlan"]]
-                    },
-                    context={"benchmark_language": "systest"},
-                    tags={"name": result["query name"]},
-                ))
-                benchmarkResults.append(BenchmarkResult(
-                    stats={
-                        "data": [result["bytesPerSecond"]],
-                        "unit": "B/s",
-                    },
-                    context={"benchmark_language": "systest"},
-                    tags={"name": result["query name"] + " [B/s]"},
-                ))
-            else:
-                benchmarkResults.append(BenchmarkResult(
-                    stats={
-                        "data": [result["time"]],
-                        "unit": "ns",
-                    },
-                    context={"benchmark_language": "systest"},
-                    tags={"name": result["query name"]},
-                ))
-                benchmarkResults.append(BenchmarkResult(
-                    stats={
-                        "data": [result["bytesPerSecond"]],
-                        "unit": "B/s",
-                    },
-                    context={"benchmark_language": "systest"},
-                    tags={"name": result["query name"] + " [B/s]"},
-                ))
+            benchmarkResults.append(BenchmarkResult(
+                stats={
+                    "data": [result["time"]],
+                    "unit": "ns"
+                },
+                context={"benchmark_language": "systest"},
+                tags={"name": result["query name"]},
+            ))
+            benchmarkResults.append(BenchmarkResult(
+                stats={
+                    "data": [result["bytesPerSecond"]],
+                    "unit": "B/s"
+                },
+                context={"benchmark_language": "systest"},
+                tags={"name": result["query name"] + "_Bps"},
+            ))
 
         return benchmarkResults
 

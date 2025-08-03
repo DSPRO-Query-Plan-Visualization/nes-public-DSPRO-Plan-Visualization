@@ -226,7 +226,7 @@ int main(int argc, char** argv)
         else if (program.is_subcommand_used("register"))
         {
             auto& registerArgs = program.at<ArgumentParser>("register");
-            const auto queryId = queryManager->registerQuery(optimizedQueryPlan);
+            const auto queryId = queryManager->registerQuery(optimizedQueryPlan, nullptr, nullptr);
             if (queryId.has_value())
             {
                 if (registerArgs.is_used("-x"))
