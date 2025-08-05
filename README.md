@@ -23,6 +23,8 @@
 This is the NebulaStream fork of the DSPRO project: Automatic Plan Visualization in Conbench.
 For documentation and how to use the new feature, follow the [project report](https://github.com/DSPRO-Query-Plan-Visualization/nes-public-DSPRO-Plan-Visualization/blob/main/docs/ProjectReport.pdf) in the docs directory, especially sections 3.3.1 and 4 (you might need to open the pdf in a seperate reader, since the github view does not show the embedded links).
 
+Also check out our [Conbench repository](https://github.com/DSPRO-Query-Plan-Visualization/Conbench-Query-Plan-Visualization)!
+
 ----
 NebulaStream is our attempt to develop a general-purpose, end-to-end data management system for the IoT.
 It provides an out-of-the-box experience with rich data processing functionalities and a high ease-of-use.
