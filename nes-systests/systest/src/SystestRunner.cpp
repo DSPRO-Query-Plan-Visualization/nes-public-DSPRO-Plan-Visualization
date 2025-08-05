@@ -432,7 +432,7 @@ std::vector<RunningQuery> runQueriesAndBenchmark(
         {
             /// Since the number of incoming tuples for the sink pipeline has not been accumulated yet, we still need to get them.
             /// We can get this number by either checking the first field of the checksum sink or counting the results of any other sink
-            std::regex checksumPattern(R"(CHECKSUM\d*)");
+            std::regex const checksumPattern("checksum", std::regex_constants::icase);
             std::expected<SystestQuery::PlanInfo, Exception> planInfo = queryToRun.planInfoOrException;
 
             /// Only if the logical plan can be accessed, we may continue. Otherwise, the pipeline plan won't be integrated in the BenchmarkResult json anyway.
@@ -456,7 +456,7 @@ std::vector<RunningQuery> runQueriesAndBenchmark(
 
                 std::vector<std::string> results = queryResult.value();
 
-                if (std::regex_match(sinkName, checksumPattern))
+                if (std::regex_search(sinkName, checksumPattern))
                 {
                     /// The sink is a checksum sink, we need to read the first field of the first result to obtain the number of arrived tuples
                     const std::string result = results[0];
